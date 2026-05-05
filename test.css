@@ -1,0 +1,128 @@
+*{
+    font-family: 'Courier New', Courier, monospace;box-sizing: border-box;
+}
+
+body {
+    /* background-color: #E8E9DE; */
+    margin:0px;
+}
+
+.back{
+    position: absolute; /* untuk kekalkan kat atas kiri */ 
+    border-style: none;
+    background-color: #E8E9DE;
+    font-size: 1.2rem;
+    font-weight:bold;
+    color: #241253;
+    margin: 15px;
+    
+}
+
+header h1{
+    color: #241253;
+    margin-bottom:0px;
+    padding: 0;
+    font-size: 3.5rem;
+    
+    text-shadow: 1px 1px 0px rgba(0, 0, 0, 0.395);
+}
+
+p{
+    font-weight: normal;
+}
+
+#wrapper{
+    display: flex;
+    height: 100vh;
+    width: 100vw; /*vw - viewport width  */
+    overflow: hidden;
+}
+
+.leftcontainer{
+
+    
+
+    flex: 1;
+    gap:0px;
+    background-color: #E8E9DE;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    
+}
+
+
+
+.rightcontainer{
+    flex: 1;
+    background-color: #241253; 
+    color: #E8E9DE;
+    border-top-left-radius: 40px;
+    border-bottom-left-radius: 40px;
+    padding-top: 10px;padding-left: 50px;
+    display: flex;
+    flex-direction: column;
+    animation: slideLeft 1.0s ease-in-out forwards;
+}
+
+.rightcontainer form {
+    width: 100%;
+    max-width: 700px; 
+}
+
+.rightcontainer input,.rightcontainer select{
+    width: 100%;
+    background-color: #e8e9deb9;
+    border: 20px;
+    padding-right: 15px;
+    padding: 15px 15px;
+    margin-bottom: 20px;
+    outline: none;
+    font-size: 1rem;
+    border-radius: 25px;
+    
+    align-items: center;
+}
+
+.nameGenderRow{
+    display: flex;
+    gap: 15px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.nameGenderRow input{
+    flex:2;
+}
+
+.nameGenderRow select{
+    flex:1;
+    padding-right:30px;
+}
+
+.rightcontainer button{
+    width: 100%;
+    background-color: #E8E9DE;
+    border: 20px;
+    padding-right: 15px;
+    padding: 15px 15px;
+    font-size: 1.1rem;
+    margin-top: 270px;
+    border-radius: 25px;
+    font-weight: bold;
+}
+
+.rightcontainer input:hover,.rightcontainer select:hover{
+    background-color: #e8e9ded0;
+    color:rgba(0, 0, 0, 0.362);
+}
+
+.rightcontainer button:hover{
+    background-color: #e3e4d6;
+    color:rgba(0, 0, 0, 0.707);
+    cursor: pointer;
+    transform: translateY(-1px);
+}
+
