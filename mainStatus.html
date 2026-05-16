@@ -38,16 +38,7 @@
             margin: 15px;
 
         }
-
-        header h1 {
-            color: #241253;
-            margin-bottom: 0px;
-            padding: 0;
-            font-size: 3.5rem;
-
-            text-shadow: 1px 1px 0px rgba(0, 0, 0, 0.395);
-        }
-
+        
         p {
             font-weight: normal;
         }
@@ -61,9 +52,6 @@
         }
 
         .leftcontainer {
-
-
-
             flex: 1;
             gap: 0px;
             background-color: #E8E9DE;
@@ -76,6 +64,9 @@
         }
 
 
+        h1 {
+            margin-bottom: 10px;
+        }
 
         .rightcontainer {
             flex: 2;
@@ -102,17 +93,132 @@
             margin-top: 600px;
             padding: 15px 15px;
             font-size: 1.1rem;
-            
             border-radius: 25px;
             font-weight: bold;
-            color:#E8E9DE
+            color: #E8E9DE
         }
 
         #booking:hover {
-        background-color: #37216d;
-        cursor: pointer;
-        transform: translateY(-2px);
-    }
+            background-color: #37216d;
+            cursor: pointer;
+            transform: translateY(-2px);
+        }
+
+
+        #filterBtn {
+            background-color: #241253;
+            color: white;
+            border: 1px solid #42297d;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-family: sans-serif;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            width: 160px;
+        }
+
+        #filterBtn:hover {
+            background-color: #341d6d93;
+        }
+
+
+        #filterBtn .arrow {
+            display: inline-block;
+            transition: transform 0.3s ease;
+
+        }
+
+
+        #filterBtn.rotated .arrow {
+            transform: rotate(180deg);
+        }
+
+
+        .filter-wrapper {
+            text-align: right;
+            margin-right: 20px;
+            padding-right: 15px;
+            margin-top: 15px;
+
+        }
+
+
+        .status-card {
+            background-color: #f1f0ea;
+            margin-top: 20px;
+            border-radius: 24px;
+            padding: 24px;
+            color: #1e1b4b;
+            font-family: sans-serif;
+            width: 97%;
+            max-width: none;
+            box-sizing: border-box;
+
+        }
+
+        .header-main {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            margin-bottom: 16px;
+        }
+
+        .button-container {
+            text-align: right;
+        }
+
+
+        .card-details {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease-out;
+
+        }
+
+        .details-header {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-top: 10px;
+            font-weight: bold;
+            margin-bottom: 12px;
+            color: #1e1b4b;
+        }
+
+        
+
+        .card-details.open {
+            max-height: 300px;
+        }
+
+
+        #viewDetailsBtn .btn-arrow {
+            display: inline-block;
+            transition: transform 0.3s;
+        }
+
+        #viewDetailsBtn.active .btn-arrow {
+            transform: rotate(180deg);
+        }
+
+
+        .item-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 8px 0;
+        }
+
+        .line-spacer {
+            flex-grow: 1;
+            border-bottom: 1px solid #94a3b8;
+            margin: 0 12px;
+        }
+
+        
     </style>
 </head>
 
@@ -121,7 +227,7 @@
     <div id="wrapper">
         <button class="back" onclick="history.back()"> &#60; Back</button>
         <div class="leftcontainer">
-            <button type="button" id="booking" onclick="window.location.href='booking.html'">
+            <button type="button" id="booking" onclick="window.location.href='form.html'">
                 Book space
             </button>
         </div>
@@ -129,20 +235,117 @@
         <div class="rightcontainer">
             <p id="userName">Welcome, <span id="currentName">Guest</span>!</p>
             <h1>Status</h1>
+
+            <div class="filter-wrapper">
+                <button id="filterBtn" data-order="recent">
+                    <span id="filterLabel">Recent to Old</span>
+                    <span class="arrow">&#9662;</span>
+                </button>
+            </div>
+
+            <div class="status-card">
+                <div class="card-header">
+                    <div class="header-main">
+                        <span class="order-id">ID: 00156</span>
+                        <span class="status-text">To be dropped off</span>
+                    </div>
+
+                    <div class="summary-info">
+                        <p>Drop-off date: 16 May 2026</p>
+                        <p>Pick-up date: 16 June 2026</p>
+                        <p>Item quantity: 3</p>
+                        <p>College: Lestari B</p>
+                        <p>Total fee: RM1.50</p>
+                    </div>
+
+                    <div class="button-container">
+                        <button id="viewDetailsBtn">
+                            <span class="btn-text">View details</span>
+                            <span class="btn-arrow">&#9662;</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card-details" id="detailsPanel">
+                    <div class="details-content">
+                        <div class="details-header">
+                            <span>Item details</span>
+                            <span>Quantity</span>
+                        </div>
+                        <div class="item-row">
+                            <span>Bag small</span>
+                            <span class="line-spacer"></span>
+                            <span>1</span>
+                        </div>
+                        <div class="item-row">
+                            <span>Bucket/pail</span>
+                            <span class="line-spacer"></span>
+                            <span>1</span>
+                        </div>
+                        <div class="item-row">
+                            <span>Fan</span>
+                            <span class="line-spacer"></span>
+                            <span>1</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 
     <script>
-        // 1. Placeholder variable (starts as "Guest", changes dynamically later)
+
         let loggedInUser = "Guest";
 
-        // 2. Grab the span element inside the paragraph
         const nameSpan = document.getElementById("currentName");
 
-        // 3. Inject the name if a user is logged in
+        //inject user's name when they logged in
         if (loggedInUser) {
             nameSpan.textContent = loggedInUser;
         }
+
+
+        const filterBtn = document.getElementById("filterBtn");
+        const filterLabel = document.getElementById("filterLabel");
+
+
+        filterBtn.addEventListener("click", function () {
+
+            let currentOrder = filterBtn.getAttribute("data-order");
+
+            if (currentOrder === "recent") {
+
+                filterLabel.textContent = "Old to Recent";
+                filterBtn.setAttribute("data-order", "old");
+                filterBtn.classList.add("rotated");
+
+
+
+            } else {
+                // switch back to recent to old
+                filterLabel.textContent = "Recent to Old";
+                filterBtn.setAttribute("data-order", "recent");
+                filterBtn.classList.remove("rotated");
+
+
+            }
+        });
+
+        const viewDetailsBtn = document.getElementById("viewDetailsBtn");
+        const detailsPanel = document.getElementById("detailsPanel");
+        const btnText = viewDetailsBtn.querySelector(".btn-text");
+
+        viewDetailsBtn.addEventListener("click", function () {
+            detailsPanel.classList.toggle("open");
+            viewDetailsBtn.classList.toggle("active");
+            if (detailsPanel.classList.contains("open")) {
+                btnText.textContent = "Hide details";
+            } else {
+                btnText.textContent = "View details";
+            }
+        });
+
     </script>
 </body>
 

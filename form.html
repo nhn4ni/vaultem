@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VaulteM</title>
+    <style>
+        * {
+            font-family: 'Courier New', Courier, monospace;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #E8E9DE;
+            margin: 0px;
+        }
+
+        .back {
+            border-style: none;
+            background-color: #E8E9DE;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #241253;
+            margin: 15px;
+            padding-bottom: 20px;
+        }
+
+        #formLayout {
+            color: #241253;
+            padding-left: 20px;
+        }
+
+        .formContainer {
+            padding: 0 25px;
+        }
+
+        h2 {
+            color: #241253;
+            font-size: 1.2rem;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+
+        .collegeGrid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            width: 45%;
+        }
+
+        .collegeCard {
+            background-color: #241253;
+            color: white;
+            border-radius: 20px;
+            padding: 20px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            min-height: 140px;
+        }
+
+        .collegeCard h3 {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: normal;
+        }
+
+        .collegeCard p {
+            margin: 10px 0;
+            font-size: 0.9rem;
+            color: #d1cbdc;
+        }
+
+        .selectBtn {
+            background-color: #f1f0ea;
+            color: #241253;
+            border: none;
+            border-radius: 15px;
+            padding: 6px 20px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .selectBtn:hover {
+            background-color: #dfddd3;
+            transform: scale(1.02);
+        }
+
+        .dateSection {
+            margin-top: 25px;
+        }
+
+        .dateRow {
+            display: flex;
+            gap: 12px;
+        }
+
+        .selectWrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .dateRow select {
+            background-color: #241253;
+            color: white;
+            border: none;
+            border-radius: 15px;
+            padding: 10px 20px;
+            font-size: 1rem;
+            cursor: pointer;
+            min-width: 80px;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml;utf8,<svg fill='white' height='24' viewBox='0 0 24 24' width='24' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/><path d='M0 0h24v24H0z' fill='none'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            padding-right: 35px;
+        }
+
+        .selectWrapper span {
+            color: #7a6e93;
+            font-size: 0.8rem;
+            margin-top: 4px;
+        }
+
+        .feeFooter {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: #241253;
+            color: white;
+            border-top-left-radius: 28px;
+            border-top-right-radius: 28px;
+            padding: 25px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .feeText {
+            font-size: 1.8rem;
+            font-weight: bold;
+        }
+
+        .priceAmt {
+            margin-left: 20px;
+        }
+
+        .submitBtn {
+            background-color: #E8E9DE;
+            color: #241253;
+            border: none;
+            border-radius: 20px;
+            padding: 10px 35px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .submitBtn:hover {
+            background-color: #dfddd3;
+            transform: scale(1.02);
+        }
+    </style>
+</head>
+
+<body>
+    <button class="back" onclick="history.back()"> &#60; Back</button>
+
+    <div id="formLayout">
+        <h1>Booking Form</h1>
+        <h3>Residential College</h3>
+
+        <div class="collegeGrid">
+            <div class="collegeCard">
+                <h3>Satria Jebat</h3>
+                <p>Space : ?? unit</p>
+                <button class="selectBtn">Select</button>
+            </div>
+
+            <div class="collegeCard">
+                <h3>Satria Tuah</h3>
+                <p>Space : ?? unit</p>
+                <button class="selectBtn">Select</button>
+            </div>
+
+            <div class="collegeCard">
+                <h3>Satria Kasturi</h3>
+                <p>Space : ?? unit</p>
+                <button class="selectBtn">Select</button>
+            </div>
+
+            <div class="collegeCard">
+                <h3>Lestari A1 / A2</h3>
+                <p>Space : ?? unit</p>
+                <button class="selectBtn">Select</button>
+            </div>
+        </div>
+
+        <div class="dateSection">
+            <h2>Drop-off date</h2>
+            <div class="dateRow">
+                <div class="selectWrapper">
+                    <select>
+                        <option>12</option>
+                    </select>
+                    <span>day</span>
+                </div>
+                <div class="selectWrapper">
+                    <select>
+                        <option>April</option>
+                    </select>
+                    <span>month</span>
+                </div>
+                <div class="selectWrapper">
+                    <select>
+                        <option>2026</option>
+                    </select>
+                    <span>year</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="dateSection">
+            <h2>Pickup date</h2>
+            <div class="dateRow">
+                <div class="selectWrapper">
+                    <select>
+                        <option>12</option>
+                    </select>
+                    <span>day</span>
+                </div>
+                <div class="selectWrapper">
+                    <select>
+                        <option>April</option>
+                    </select>
+                    <span>month</span>
+                </div>
+                <div class="selectWrapper">
+                    <select>
+                        <option>2026</option>
+                    </select>
+                    <span>year</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="feeFooter">
+        <div class="feeText">
+            Total Fee RM <span class="priceAmt">0.50</span>
+        </div>
+        <button class="submitBtn">Submit</button>
+    </div>
+</body>
+
+</html>
