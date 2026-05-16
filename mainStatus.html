@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VaulteM</title>
+    <!-- <link rel="stylesheet" href="mainStatus.css" type="text/css"> -->
+
+    <style>
+        #userName {
+            text-align: right;
+            
+            margin-top: 20px;
+            
+            margin-right: 20px;
+            
+        }
+
+        * {
+            font-family: 'Courier New', Courier, monospace;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #E8E9DE;
+            margin: 0px;
+        }
+
+        .back {
+            position: absolute;
+            /* untuk kekalkan kat atas kiri */
+            border-style: none;
+            background-color: #E8E9DE;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #241253;
+            margin: 15px;
+
+        }
+
+        header h1 {
+            color: #241253;
+            margin-bottom: 0px;
+            padding: 0;
+            font-size: 3.5rem;
+
+            text-shadow: 1px 1px 0px rgba(0, 0, 0, 0.395);
+        }
+
+        p {
+            font-weight: normal;
+        }
+
+        #wrapper {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+            
+            overflow: hidden;
+        }
+
+        .leftcontainer {
+
+
+
+            flex: 1;
+            gap: 0px;
+            background-color: #E8E9DE;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+
+        }
+
+
+
+        .rightcontainer {
+            flex: 2;
+            background-color: #241253;
+            color: #E8E9DE;
+            border-top-left-radius: 40px;
+            border-bottom-left-radius: 40px;
+            padding-top: 10px;
+            padding-left: 50px;
+            display: flex;
+            flex-direction: column;
+            animation: slideLeft 1.0s ease-in-out forwards;
+        }
+
+        #userName {
+            text-align: right;
+            padding-right: 20px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="wrapper">
+        <button class="back" onclick="history.back()"> &#60; Back</button>
+        <div class="leftcontainer">
+            <button type="button" id="booking" onclick="window.location.href='booking.html'">
+                Book space
+                </button>
+        </div>
+
+        <div class="rightcontainer">
+            <p id="userName">Welcome, <span id="currentName">Guest</span>!</p>
+            <h1>Status</h1>
+        </div>
+    </div>
+
+    <script>
+        // 1. Placeholder variable (starts as "Guest", changes dynamically later)
+        let loggedInUser = "Guest";
+
+        // 2. Grab the span element inside the paragraph
+        const nameSpan = document.getElementById("currentName");
+
+        // 3. Inject the name if a user is logged in
+        if (loggedInUser) {
+            nameSpan.textContent = loggedInUser;
+        }
+    </script>
+</body>
+
+</html>
