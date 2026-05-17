@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VaulteM</title>
+
     <style>
         * {
             font-family: 'Courier New', Courier, monospace;
@@ -13,7 +14,7 @@
 
         body {
             background-color: #E8E9DE;
-            margin: 0px;
+            margin: 0;
         }
 
         .back {
@@ -24,15 +25,24 @@
             color: #241253;
             margin: 15px;
             padding-bottom: 20px;
+            cursor: pointer;
+        }
+
+        .leftContainer {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 0 40px;
+            gap: 60px;
         }
 
         #formLayout {
             color: #241253;
-            padding-left: 20px;
+            width: 65%;
         }
 
-        .formContainer {
-            padding: 0 25px;
+        h1 {
+            margin-top: 0;
         }
 
         h2 {
@@ -46,7 +56,6 @@
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 15px;
-            width: 45%;
         }
 
         .collegeCard {
@@ -85,9 +94,9 @@
             font-size: 0.9rem;
         }
 
-        .selectBtn:hover {
-            background-color: #dfddd3;
-            transform: scale(1.02);
+        .selectBtn:hover{
+            transform: scale(1.05);
+            background-color: #e8e6df;
         }
 
         .dateSection {
@@ -116,7 +125,7 @@
             min-width: 80px;
             appearance: none;
             -webkit-appearance: none;
-            background-image: url("data:image/svg+xml;utf8,<svg fill='white' height='24' viewBox='0 0 24 24' width='24' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/><path d='M0 0h24v24H0z' fill='none'/></svg>");
+            background-image: url("data:image/svg+xml;utf8,<svg fill='white' height='24' viewBox='0 0 24 24' width='24' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
             background-repeat: no-repeat;
             background-position: right 10px center;
             padding-right: 35px;
@@ -126,6 +135,82 @@
             color: #7a6e93;
             font-size: 0.8rem;
             margin-top: 4px;
+        }
+
+        #itemDetailsContainer {
+            width: 35%;
+            margin-top: 80px;
+            color: #241253;
+        }
+
+        .detailsHeader {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 25px;
+            font-weight: bold;
+            font-size: 1.1rem;
+        }
+
+        .itemRow {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 25px;
+        }
+
+        .itemLeft {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .chooseBtn {
+            background-color: #241253;
+            border: none;
+            border-radius: 20px;
+            color: #f1f0ea;
+            font-size: 1rem;
+            cursor: pointer;
+            padding:6px;
+            
+        }
+
+        .bagDropdown {
+            background-color: #241253;
+            border-radius: 20px;
+            padding: 15px 20px;
+            width: 280px;
+        }
+
+        .bagOption {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: white;
+            margin-bottom: 15px;
+        }
+
+        .bagOption:last-child {
+            margin-bottom: 0;
+        }
+
+        .bagOption input {
+            width: 70px;
+            border: none;
+            border-radius: 15px;
+            padding: 6px 10px;
+            text-align: center;
+            background-color: #E8E9DE;
+            color: #241253;
+        }
+
+        .itemRow select {
+            background-color: #241253;
+            color: white;
+            border: none;
+            border-radius: 15px;
+            padding: 8px 15px;
+            min-width: 100px;
         }
 
         .feeFooter {
@@ -141,7 +226,6 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            z-index: 100;
         }
 
         .feeText {
@@ -164,101 +248,223 @@
             cursor: pointer;
         }
 
-        .submitBtn:hover {
-            background-color: #dfddd3;
-            transform: scale(1.02);
+        .submitBtn:hover{
+            transform: scale(1.05);
+            background-color: #d8dacd;
+        }
+        .bagDropdown {
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            transition: all 0.4s ease;
+            transform: translateY(-10px);
+        }
+
+        .bagDropdown.show{
+            max-height: 300px;
+            opacity: 1;
+            transform: translateY(0);
         }
     </style>
 </head>
 
 <body>
-    <button class="back" onclick="history.back()"> &#60; Back</button>
 
-    <div id="formLayout">
-        <h1>Booking Form</h1>
-        <h3>Residential College</h3>
+    <button class="back" onclick="history.back()">&#60; Back</button>
 
-        <div class="collegeGrid">
-            <div class="collegeCard">
-                <h3>Satria Jebat</h3>
-                <p>Space : ?? unit</p>
-                <button class="selectBtn">Select</button>
+    <div class="leftContainer">
+
+        <div id="formLayout">
+
+            <h1>Booking Form</h1>
+            <h3>Residential College</h3>
+
+            <div class="collegeGrid">
+
+                <div class="collegeCard">
+                    <h3>Satria Jebat</h3>
+                    <p>Space : ?? unit</p>
+                    <button class="selectBtn">Select</button>
+                </div>
+
+                <div class="collegeCard">
+                    <h3>Satria Tuah</h3>
+                    <p>Space : ?? unit</p>
+                    <button class="selectBtn">Select</button>
+                </div>
+
+                <div class="collegeCard">
+                    <h3>Satria Kasturi</h3>
+                    <p>Space : ?? unit</p>
+                    <button class="selectBtn">Select</button>
+                </div>
+
+                <div class="collegeCard">
+                    <h3>Lestari A1 / A2</h3>
+                    <p>Space : ?? unit</p>
+                    <button class="selectBtn">Select</button>
+                </div>
+
             </div>
 
-            <div class="collegeCard">
-                <h3>Satria Tuah</h3>
-                <p>Space : ?? unit</p>
-                <button class="selectBtn">Select</button>
+            <div class="dateSection">
+
+                <h2>Drop-off date</h2>
+
+                <div class="dateRow">
+
+                    <div class="selectWrapper">
+                        <select>
+                            <option>12</option>
+                        </select>
+                        <span>day</span>
+                    </div>
+
+                    <div class="selectWrapper">
+                        <select>
+                            <option>April</option>
+                        </select>
+                        <span>month</span>
+                    </div>
+
+                    <div class="selectWrapper">
+                        <select>
+                            <option>2026</option>
+                        </select>
+                        <span>year</span>
+                    </div>
+
+                </div>
+
             </div>
 
-            <div class="collegeCard">
-                <h3>Satria Kasturi</h3>
-                <p>Space : ?? unit</p>
-                <button class="selectBtn">Select</button>
+            <div class="dateSection">
+
+                <h2>Pickup date</h2>
+
+                <div class="dateRow">
+
+                    <div class="selectWrapper">
+                        <select>
+                            <option>12</option>
+                        </select>
+                        <span>day</span>
+                    </div>
+
+                    <div class="selectWrapper">
+                        <select>
+                            <option>April</option>
+                        </select>
+                        <span>month</span>
+                    </div>
+
+                    <div class="selectWrapper">
+                        <select>
+                            <option>2026</option>
+                        </select>
+                        <span>year</span>
+                    </div>
+
+                </div>
+
             </div>
 
-            <div class="collegeCard">
-                <h3>Lestari A1 / A2</h3>
-                <p>Space : ?? unit</p>
-                <button class="selectBtn">Select</button>
-            </div>
         </div>
 
-        <div class="dateSection">
-            <h2>Drop-off date</h2>
-            <div class="dateRow">
-                <div class="selectWrapper">
-                    <select>
-                        <option>12</option>
-                    </select>
-                    <span>day</span>
-                </div>
-                <div class="selectWrapper">
-                    <select>
-                        <option>April</option>
-                    </select>
-                    <span>month</span>
-                </div>
-                <div class="selectWrapper">
-                    <select>
-                        <option>2026</option>
-                    </select>
-                    <span>year</span>
-                </div>
+        <div id="itemDetailsContainer">
+
+            <div class="detailsHeader">
+                <span>Item details</span>
+                <span>Quantity</span>
             </div>
+
+            <div class="itemRow">
+
+                <div class="itemLeft">
+
+                    <span>Bag</span>
+
+                    <div class="bagDropdown">
+
+                        <div class="bagOption">
+                            <span>Big</span>
+                            <input type="number" value="0" min="0">
+                        </div>
+
+                        <div class="bagOption">
+                            <span>Medium</span>
+                            <input type="number" value="0" min="0">
+                        </div>
+
+                        <div class="bagOption">
+                            <span>Small</span>
+                            <input type="number" value="0" min="0">
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <button class="chooseBtn">Choose &#11206;</button>
+
+            </div>
+
+            <div class="itemRow">
+                <span>Luggage</span>
+
+                <select>
+                    <option>Choose</option>
+                </select>
+            </div>
+
+            <div class="itemRow">
+                <span>Box</span>
+
+                <select>
+                    <option>Choose</option>
+                </select>
+            </div>
+
+            <div class="itemRow">
+                <span>Bucket/Pail</span>
+
+                <select>
+                    <option>Choose</option>
+                </select>
+            </div>
+
+            <div class="itemRow">
+                <span>Others</span>
+
+                <select>
+                    <option>Choose</option>
+                </select>
+            </div>
+
         </div>
 
-        <div class="dateSection">
-            <h2>Pickup date</h2>
-            <div class="dateRow">
-                <div class="selectWrapper">
-                    <select>
-                        <option>12</option>
-                    </select>
-                    <span>day</span>
-                </div>
-                <div class="selectWrapper">
-                    <select>
-                        <option>April</option>
-                    </select>
-                    <span>month</span>
-                </div>
-                <div class="selectWrapper">
-                    <select>
-                        <option>2026</option>
-                    </select>
-                    <span>year</span>
-                </div>
-            </div>
-        </div>
     </div>
 
     <div class="feeFooter">
+
         <div class="feeText">
             Total Fee RM <span class="priceAmt">0.50</span>
         </div>
+
         <button class="submitBtn">Submit</button>
+
     </div>
+
+    <script>
+        const chooseBtn = document.querySelector(".chooseBtn");
+        const dropdown = document.querySelector(".bagDropdown");
+        
+
+        chooseBtn.addEventListener("click", () => {
+            dropdown.classList.toggle("show");
+        });
+    </script>
+
 </body>
 
 </html>
