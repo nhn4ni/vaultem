@@ -34,11 +34,13 @@
             align-items: flex-start;
             padding: 0 40px;
             gap: 60px;
+            flex-wrap: wrap;
         }
 
         #formLayout {
             color: #241253;
-            width: 65%;
+            flex: 1;
+            min-width: 500px;
         }
 
         h1 {
@@ -94,7 +96,7 @@
             font-size: 0.9rem;
         }
 
-        .selectBtn:hover{
+        .selectBtn:hover {
             transform: scale(1.05);
             background-color: #e8e6df;
         }
@@ -138,9 +140,12 @@
         }
 
         #itemDetailsContainer {
-            width: 35%;
-            margin-top: 80px;
+            flex: 1;
+            min-width: 300px;
+            margin-top: 70px;
             color: #241253;
+            margin-bottom: 100px;
+            margin-left: 50px;
         }
 
         .detailsHeader {
@@ -171,8 +176,8 @@
             color: #f1f0ea;
             font-size: 1rem;
             cursor: pointer;
-            padding:6px;
-            
+            padding: 6px;
+
         }
 
         .bagDropdown {
@@ -248,10 +253,11 @@
             cursor: pointer;
         }
 
-        .submitBtn:hover{
+        .submitBtn:hover {
             transform: scale(1.05);
             background-color: #d8dacd;
         }
+
         .bagDropdown {
             max-height: 0;
             opacity: 0;
@@ -260,10 +266,20 @@
             transform: translateY(-10px);
         }
 
-        .bagDropdown.show{
+        .bagDropdown.show {
             max-height: 300px;
             opacity: 1;
             transform: translateY(0);
+        }
+
+        #bucketInput{
+            border-radius: 20px;
+            border-style: none;
+            border:1.5px solid #241253;
+            width:15%;
+            padding: 10px;
+            background-color:#ffffff;
+            color: #241253;
         }
     </style>
 </head>
@@ -410,27 +426,70 @@
             </div>
 
             <div class="itemRow">
-                <span>Luggage</span>
 
-                <select>
-                    <option>Choose</option>
-                </select>
+                <div class="itemLeft">
+
+                    <span>Luggage</span>
+
+                    <div class="luggageDropdown bagDropdown">
+
+                        <div class="bagOption">
+                            <span>Large</span>
+                            <input type="number" value="0" min="0">
+                        </div>
+
+                        <div class="bagOption">
+                            <span>Medium</span>
+                            <input type="number" value="0" min="0">
+                        </div>
+
+                        <div class="bagOption">
+                            <span>Small</span>
+                            <input type="number" value="0" min="0">
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <button class="luggageBtn chooseBtn">Choose &#11206;</button>
+
             </div>
 
             <div class="itemRow">
-                <span>Box</span>
 
-                <select>
-                    <option>Choose</option>
-                </select>
+                <div class="itemLeft">
+
+                    <span>Box</span>
+
+                    <div class="boxDropdown bagDropdown">
+
+                        <div class="bagOption">
+                            <span>Big Box</span>
+                            <input type="number" value="0" min="0">
+                        </div>
+
+                        <div class="bagOption">
+                            <span>Medium Box</span>
+                            <input type="number" value="0" min="0">
+                        </div>
+
+                        <div class="bagOption">
+                            <span>Small Box</span>
+                            <input type="number" value="0" min="0">
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <button class="boxBtn chooseBtn">Choose &#11206;</button>
+
             </div>
-
             <div class="itemRow">
                 <span>Bucket/Pail</span>
 
-                <select>
-                    <option>Choose</option>
-                </select>
+                <input id="bucketInput" type="number" min="0">
             </div>
 
             <div class="itemRow">
@@ -456,13 +515,28 @@
     </div>
 
     <script>
+
         const chooseBtn = document.querySelector(".chooseBtn");
         const dropdown = document.querySelector(".bagDropdown");
-        
 
         chooseBtn.addEventListener("click", () => {
             dropdown.classList.toggle("show");
         });
+
+        const luggageBtn = document.querySelector(".luggageBtn");
+        const luggageDropdown = document.querySelector(".luggageDropdown");
+
+        luggageBtn.addEventListener("click", () => {
+            luggageDropdown.classList.toggle("show");
+        });
+
+        const boxBtn = document.querySelector(".boxBtn");
+        const boxDropdown = document.querySelector(".boxDropdown");
+
+        boxBtn.addEventListener("click", () => {
+            boxDropdown.classList.toggle("show");
+        });
+
     </script>
 
 </body>
