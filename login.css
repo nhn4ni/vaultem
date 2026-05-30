@@ -73,6 +73,7 @@ p{
 }
 
 .rightcontainer input,.rightcontainer select{
+    display: block;
     width: 100%;
     background-color: #e8e9deb9;
     border: 20px;
@@ -81,26 +82,11 @@ p{
     margin-bottom: 20px;
     outline: none;
     font-size: 1rem;
-    border-radius: 25px;
+    border-radius: 20px;
     
     align-items: center;
 }
 
-.nameGenderRow{
-    display: flex;
-    gap: 15px;
-    width: 100%;
-    box-sizing: border-box;
-}
-
-.nameGenderRow input{
-    flex:2;
-}
-
-.nameGenderRow select{
-    flex:1;
-    padding-right:30px;
-}
 
 .rightcontainer button{
     width: 100%;

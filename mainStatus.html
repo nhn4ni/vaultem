@@ -14,6 +14,14 @@
             font-family: 'Courier New', Courier, monospace;
             box-sizing: border-box;
         }
+        header h1 {
+        color: #241253;
+        font-size: 35px;
+        text-align: center;
+        margin-bottom: 0px;
+        padding: 0;
+        text-shadow: 1px 1.2px 0px rgba(0, 0, 0, 0.395);
+    }
 
          #userName {
             text-align: right;
@@ -329,17 +337,19 @@
         .hidden{
             display: none !important;
         }
-
-        
-        
     </style>
 </head>
 
 <body>
 
     <div id="wrapper">
-        <button class="back" onclick="history.back()"> &#60; Back</button>
+        <!--<button class="back" onclick="history.back()"> &#60; Back</button>-->
+        
         <div class="leftcontainer">
+            <header>
+                <h1>VaulteM</h1>
+            </header>
+
             <button type="button" id="booking" onclick="window.location.href='form.html'">
                 Book space
             </button>
@@ -498,7 +508,7 @@
         }
 
         function logout(){
-            window.location.href='signin.html';
+            window.location.href='studentMAIN.html';
         }
 
         function showProfile(){
