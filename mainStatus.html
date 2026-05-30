@@ -8,19 +8,53 @@
     <!-- <link rel="stylesheet" href="mainStatus.css" type="text/css"> -->
 
     <style>
-        #userName {
-            text-align: right;
-
-            margin-top: 20px;
-
-            margin-right: 20px;
-
-        }
+       
 
         * {
             font-family: 'Courier New', Courier, monospace;
             box-sizing: border-box;
         }
+
+         #userName {
+            text-align: right;
+            margin-top: 20px;
+            margin-right: 20px;
+        }
+
+        #userImage{
+            vertical-align: middle;
+            margin-left: 10px;
+            margin-top: -3px;
+        }
+
+        #userImage:hover{
+            cursor: pointer;
+        }
+
+        #profileSelect{
+            position: absolute;
+            right: 23px;
+            top: 50px;
+            background-color: #E8E9DE;
+            border: 0px;
+        }
+
+        #profileSelect button{
+            text-align: left;
+            display: block;
+            width: 100%;
+            color: #1e1b4b;
+            background-color: #E8E9DE;
+            border: 50px;
+            margin-bottom: 5px;
+            margin-top: 5px;
+        }
+
+        #profileSelect button:hover{
+            cursor: pointer;
+        }
+
+        
 
         body {
             background-color: #E8E9DE;
@@ -81,11 +115,6 @@
             animation: slideLeft 1.0s ease-in-out forwards;
         }
 
-        #userName {
-            text-align: right;
-            padding-right: 20px;
-        }
-
         #booking {
             width: 90%;
             background-color: #241253;
@@ -104,6 +133,7 @@
             transform: translateY(-2px);
         }
 
+        
 
         #filterBtn {
             background-color: #241253;
@@ -218,6 +248,89 @@
             margin: 0 12px;
         }
 
+        #logoutPopup{
+            position: fixed;
+            top: 0%;
+            left: 0%;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.4);
+        }
+    
+        #logoutText{
+            background-color: #f1f0ea;
+            padding: 30px;
+            border-radius: 20px;
+            width: 300px;
+            text-align: center;
+        }
+
+        #logoutButton{
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        #logoutButton button{
+            padding: 10px;
+            cursor: pointer;
+            border: none;
+            font-weight: bold;
+        }
+        
+        /*#yesBTN{
+            background:#d9534f;
+            color: white;
+        }
+        #noBTN{
+            background: #4caf50;
+            color: white;
+            margin-left: 2px;
+        }*/
+
+        #profilePopup{
+            position: fixed;
+            top: 0%;
+            left: 0%;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.4);
+        }
+
+        #profileShortDetails{
+            background-color: #f1f0ea;
+            padding: 30px;
+            border-radius: 20px;
+            width: 300px;
+            text-align: center;
+        }
+
+        #profileBTN{
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        #profileBTN button{
+            padding: 10px;
+            cursor: pointer;
+            border: 50px;
+            font-weight: bold;
+        }
+        #close{
+            color: red;
+        }
+
+        .hidden{
+            display: none !important;
+        }
+
+        
         
     </style>
 </head>
@@ -233,7 +346,12 @@
         </div>
 
         <div class="rightcontainer">
-            <p id="userName">Welcome, <span id="currentName">Guest</span>!</p>
+            <p id="userName">Welcome, <span id="currentName">Guest</span><img id="userImage" src="/image/user.png" width="20px" height="20px" onclick="profileMenu()"></p>
+            <div id="profileSelect" class="hidden">
+                <button onclick="showProfile();">Profile</button>
+                <button onclick="window.location.href='setting.html'">Settings?</button>
+                <button onclick="showLog();">Logout</button>
+            </div>
             <h1>Status</h1>
 
             <div class="filter-wrapper">
@@ -294,6 +412,31 @@
         </div>
     </div>
 
+    <div id="logoutPopup" class="hidden">
+        <div id="logoutText">
+            <p>Are you sure you want to logout?</p>
+        
+
+          <div id="logoutButton">
+            <button id="yesBTN" onclick="logout();">Yes</button>
+            <button id="noBTN" onclick="showLog();">No</button>
+          </div>
+        </div>
+    </div>
+
+    <div id="profilePopup" class="hidden">
+        <div id="profileShortDetails">
+            <h3>Profile</h3>
+            <p>Name: <span id="profileName"></span></p>
+            <p>Gender: <span id="profileGender"></span></p>
+            <p>Email: <span id="profileEmail"></span></p>
+
+            <div id="profileBTN">
+                <button id="close" onclick="showProfile()">Close Profile</button>
+                <button onclick="window.location.href='profile.html'">More Details</button>
+            </div>
+        </div>
+    </div>
     <script>
 
         let loggedInUser = "Guest";
@@ -345,6 +488,22 @@
                 btnText.textContent = "View details";
             }
         });
+
+        function profileMenu(){
+            document.getElementById('profileSelect').classList.toggle('hidden');
+        }
+
+        function showLog(){
+            document.getElementById('logoutPopup').classList.toggle('hidden');
+        }
+
+        function logout(){
+            window.location.href='signin.html';
+        }
+
+        function showProfile(){
+            document.getElementById('profilePopup').classList.toggle('hidden');
+        }
 
     </script>
 </body>
