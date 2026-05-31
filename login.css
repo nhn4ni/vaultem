@@ -112,3 +112,48 @@ p{
     transform: translateY(-1px);
 }
 
+#popupError{
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+ #emptyField{
+    background-color: #f1f0ea;
+    padding: 15px;
+    border-radius: 20px;
+    width: 300px;
+    text-align: left;
+}
+
+#emptyText header{
+    background-color: #dc3545;
+    color: white;
+}
+#emptyText header h3{
+    margin: 0px;
+}
+
+
+#emptyBTN{
+    margin-top: 20px;
+    display: flex;
+    justify-content: right;
+}
+#emptyBTN button{
+    padding: 10px;
+    cursor: pointer;
+    border: none;
+    font-weight: bold;
+}
+
+.hidden{
+    display: none !important;
+}
+
+

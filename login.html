@@ -21,23 +21,59 @@
 
         <div class="rightcontainer">
             <h1>Log in</h1>
-            <form>
-                <div class="nameGenderRow">
-                <!--<input type="text" placeholder="Name">
+            <form onsubmit="event.preventDefault(); login();">
+                <!--<div class="nameGenderRow">
+                <input type="text" placeholder="Name">
                     <select><option>Gender</option>
                         <option value="male">Male</option>
                         <option value="female">Female</option>
                     </select>
                 </div>-->
-                <input type="email" placeholder="Student Email"> <!--type email tmbh .com -->
-                <input type="password" placeholder="Password"> <!--type password, auto censor -->
+                <input type="email" id="userEmail" placeholder="Student Email"> <!--type email tmbh .com -->
+                <input type="password" id="userPassword" placeholder="Password"> <!--type password, auto censor -->
                 <!--<input type="password" placeholder="Confirm Password">-->
-                <button type="button" onclick="window.location.href='mainStatus.html'">
+                <button type="submit">
                 Log in
                 </button>
             </form>
         
         </div>
     </div>
+
+    <div id="popupError" class="hidden">
+        <div id="emptyField">
+            <div id="emptyText">
+                <header>
+                    <h3>Error</h3>
+                </header>
+                
+                <p>Please fill in both field</p>
+
+                <div id="emptyBTN">
+                    <button class="ok" onclick="okayBTN()">OK</button>
+                </div>
+            </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function login(){
+            const email = document.getElementById('userEmail').value;
+            const password = document.getElementById('userPassword').value;
+
+            if(email === '' || password === ''){
+                document.getElementById('popupError').classList.toggle('hidden');
+                return;
+            }
+
+            window.location.href="mainStatus.html";
+
+        }
+
+        function okayBTN(){
+            document.getElementById('popupError').classList.toggle('hidden');
+        }
+    </script>
 </body>
 </html>
