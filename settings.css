@@ -1,0 +1,78 @@
+*{
+    font-family: 'Courier New', Courier, monospace;box-sizing: border-box;
+}
+
+body {
+    /* background-color: #E8E9DE; */
+    margin:0px;
+}
+
+header h1{
+    color: #241253;
+    font-size: 50px;
+    text-align: center;
+    margin-bottom: 0px;
+    padding: 0;
+    text-shadow: 1px 1.2px 0px rgba(0, 0, 0, 0.395);
+}
+
+header h1:hover{
+    cursor: pointer;
+}
+p{
+    font-weight: normal;
+}
+
+#wrapper{
+    display: flex;
+    height: 100vh;
+    width: 100vw; /*vw - viewport width  */
+    overflow: hidden;
+}
+
+.leftcontainer{
+    flex: 1;
+    gap:0px;
+    background-color: #E8E9DE;
+    display: flex;
+    flex-direction: column;
+
+    text-align: center;
+    
+}
+
+.rightcontainer{
+    flex: 2;
+    background-color: #241253;
+    color: #E8E9DE;
+    border-top-left-radius: 40px;
+    border-bottom-left-radius: 40px;
+    padding-top: 10px;
+    padding-left: 50px;
+    display: flex;
+    flex-direction: column;
+    animation: slideLeft 1.0s ease-in-out forwards;
+}
+
+#categorySettings{
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 20px;
+    width: 90%;
+}
+
+.settingSelect{
+    background-color: #E8E9DE;
+    color: #241253;
+    padding: 20px;
+    border-radius: 20px;
+    cursor: pointer;
+}
+
+.settingSelect:hover{
+    transform: translateY(-2px);
+    background-color: #241253;
+    color: #E8E9DE;
+}
+
