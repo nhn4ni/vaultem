@@ -1,0 +1,15 @@
+@media (max-width: 768px){
+    #wrapper{
+        flex-direction: column;
+    }
+
+    .leftcontainer,
+    .rightcontainer{
+        flex: none;
+        width: 100%;
+    }
+
+    .rightcontainer{
+        border-radius: 40px 40px 0 0;
+    }
+}
