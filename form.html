@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <link rel="stylesheet" href="mobile.css" type="text/css">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -272,13 +273,13 @@
             transform: translateY(0);
         }
 
-        #bucketInput{
+        #bucketInput {
             border-radius: 20px;
             border-style: none;
-            border:1.5px solid #241253;
-            width:15%;
+            border: 1.5px solid #241253;
+            width: 15%;
             padding: 10px;
-            background-color:#ffffff;
+            background-color: #ffffff;
             color: #241253;
         }
     </style>
@@ -328,28 +329,26 @@
                 <h2>Drop-off date</h2>
 
                 <div class="dateRow">
-
                     <div class="selectWrapper">
-                        <select>
+                        <select id="formDay">
                             <option>12</option>
                         </select>
                         <span>day</span>
                     </div>
 
                     <div class="selectWrapper">
-                        <select>
+                        <select id="formMonth">
                             <option>April</option>
                         </select>
                         <span>month</span>
                     </div>
 
                     <div class="selectWrapper">
-                        <select>
+                        <select id="formYear">
                             <option>2026</option>
                         </select>
                         <span>year</span>
                     </div>
-
                 </div>
 
             </div>
@@ -359,28 +358,26 @@
                 <h2>Pickup date</h2>
 
                 <div class="dateRow">
-
                     <div class="selectWrapper">
-                        <select>
+                        <select id="formDay">
                             <option>12</option>
                         </select>
                         <span>day</span>
                     </div>
 
                     <div class="selectWrapper">
-                        <select>
+                        <select id="formMonth">
                             <option>April</option>
                         </select>
                         <span>month</span>
                     </div>
 
                     <div class="selectWrapper">
-                        <select>
+                        <select id="formYear">
                             <option>2026</option>
                         </select>
                         <span>year</span>
                     </div>
-
                 </div>
 
             </div>
@@ -510,10 +507,10 @@
             Total Fee RM <span class="priceAmt">0.50</span>
         </div>
 
-        
+
         <button type="button" class="submitBtn" onclick="window.location.href='payment.html'">
-                Submit
-            </button>
+            Submit
+        </button>
 
     </div>
 
@@ -539,6 +536,19 @@
         boxBtn.addEventListener("click", () => {
             boxDropdown.classList.toggle("show");
         });
+
+        function saveDateAndGo() {
+            
+            const day = document.getElementById('formDay').value;
+            const month = document.getElementById('formMonth').value;
+            const year = document.getElementById('formYear').value;
+
+            const combinedDate = `${day} ${month} ${year}`;
+
+            localStorage.setItem('savedDropOffDate', combinedDate);
+
+            window.location.href = 'payment.html';
+        }
 
     </script>
 

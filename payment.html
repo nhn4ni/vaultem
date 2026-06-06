@@ -43,7 +43,8 @@
 
     h2 {
         text-align: center;
-        margin-top: 0; /* Prevents default heading margins from breaking alignment */
+        margin-top: 0;
+        /* Prevents default heading margins from breaking alignment */
     }
 
     .paymentBox {
@@ -54,12 +55,14 @@
         border: 1px solid #ccc;
         border-radius: 20px;
         padding: 20px;
-        box-sizing: border-box; /* Crucial to keep padding from making the box overflow */
+        box-sizing: border-box;
+        /* Crucial to keep padding from making the box overflow */
 
         /* 1. Turn the card into a flex column */
         display: flex;
         flex-direction: column;
-        align-items: flex-start; /* Keeps top contents left-aligned */
+        align-items: flex-start;
+        /* Keeps top contents left-aligned */
     }
 
     /* Force the heading to stay centered horizontally across the box width */
@@ -86,22 +89,22 @@
         transform: translateY(-2px);
     }
 
-   
+
     .totalSection {
-        margin-top: auto; 
+        margin-top: auto;
         display: flex;
         flex-direction: column;
-        align-items: flex-start; 
+        align-items: flex-start;
         width: 100%;
     }
 
-   
+
     .totalSection p {
         margin: 5px 0;
     }
-    
+
     #payBtn {
-        margin-top: 10px; 
+        margin-top: 10px;
     }
 </style>
 
@@ -114,9 +117,23 @@
     <div id="body2">
         <div class="paymentBox">
             <h2>Payment</h2>
-            <h3>
-                Booking Summary
-            </h3>
+
+
+            <div class="bookingSummary">
+                <h3>Booking Summary</h3>
+                <p>
+                    Total Item: 
+                    <span id="totalItem">3</span></p>
+                <p>
+                    Drop-off Date: 
+                    <span id="dropOff_Date">Loading...</span></p>
+
+                
+                <p>
+                    Residential College: 
+                    <span id="resCollege">Lestari B</span></p>
+            </div>
+
             <div class="totalSection">
                 <p>Total:</p>
                 <p><span id="totalAmount">RM 0.00</span></p>
@@ -124,6 +141,17 @@
             </div>
         </div>
     </div>
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            const retrievedDate = localStorage.getItem('savedDropOffDate');
+
+            if (retrievedDate) {
+                document.getElementById('dropOff_Date').textContent = retrievedDate;
+            } else {
+                document.getElementById('dropOff_Date').textContent = "Not selected";
+            }
+        });
+    </script>
 </body>
 
 </html>
