@@ -2,6 +2,7 @@
     #wrapper{
         flex-direction: column;
         overflow: visible;
+        min-height: 100vh;
     }
 
     .leftcontainer,
@@ -9,9 +10,22 @@
         flex: none;
         width: 100%;
         margin-bottom: 25px;
+        padding-right: 5%;
+        padding-left:5%;
     }
 
     .rightcontainer{
         border-radius: 40px 40px 0 0;
+        margin-bottom: 0;
+        padding-bottom: 40px; 
+        flex-grow: 1;
+    }
+
+    .leftcontainer{
+        padding-top: 5%;
+    }
+
+    #booking{
+        margin: 2%;
     }
 }

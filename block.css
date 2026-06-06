@@ -3,7 +3,7 @@
 }
 
 body {
-    /* background-color: #E8E9DE; */
+    background-color: #E8E9DE;
     margin:0px;
 }
 
@@ -39,9 +39,6 @@ p{
 }
 
 .leftcontainer{
-
-    
-
     flex: 1;
     gap:0px;
     background-color: #E8E9DE;
