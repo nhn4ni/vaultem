@@ -1,0 +1,332 @@
+
+       
+
+        * {
+            font-family: 'Courier New', Courier, monospace;
+            box-sizing: border-box;
+        }
+        header h1 {
+        color: #241253;
+        font-size: 50px;
+        text-align: center;
+        margin-bottom: 0px;
+        padding: 0;
+        text-shadow: 1px 1.2px 0px rgba(0, 0, 0, 0.395);
+        }
+
+         #userName {
+            text-align: right;
+            margin-top: 20px;
+            margin-right: 20px;
+        }
+
+        #userImage{
+            vertical-align: middle;
+            margin-left: 10px;
+            margin-top: -3px;
+        }
+
+        #userImage:hover{
+            cursor: pointer;
+        }
+
+        #profileSelect{
+            position: absolute;
+            right: 23px;
+            top: 50px;
+            background-color: #E8E9DE;
+            border: 0px;
+        }
+
+        #profileSelect button{
+            text-align: left;
+            display: block;
+            width: 100%;
+            color: #1e1b4b;
+            background-color: #E8E9DE;
+            border: 50px;
+            margin-bottom: 5px;
+            margin-top: 5px;
+        }
+
+        #profileSelect button:hover{
+            cursor: pointer;
+        }
+
+        
+
+        body {
+            background-color: #E8E9DE;
+            margin: 0px;
+        }
+
+        .back {
+            position: absolute;
+            /* untuk kekalkan kat atas kiri */
+            border-style: none;
+            background-color: #E8E9DE;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #241253;
+            margin: 15px;
+
+        }
+        
+        p {
+            font-weight: normal;
+        }
+
+        #wrapper {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+
+            overflow: hidden;
+        }
+
+        .leftcontainer {
+            flex: 1;
+            gap: 0px;
+            background-color: #E8E9DE;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+
+        }
+
+
+        h1 {
+            margin-bottom: 10px;
+        }
+
+        .rightcontainer {
+            flex: 2;
+            background-color: #241253;
+            color: #E8E9DE;
+            border-top-left-radius: 40px;
+            border-bottom-left-radius: 40px;
+            padding-top: 10px;
+            padding-left: 50px;
+            display: flex;
+            flex-direction: column;
+            animation: slideLeft 1.0s ease-in-out forwards;
+        }
+
+        #booking {
+            width: 90%;
+            background-color: #241253;
+            border: 20px;
+            margin-top: 600px;
+            margin-bottom: 5%;
+            padding: 15px 15px;
+            font-size: 1.1rem;
+            border-radius: 25px;
+            font-weight: bold;
+            color: #E8E9DE
+        }
+
+        #booking:hover {
+            background-color: #37216d;
+            cursor: pointer;
+            transform: translateY(-2px);
+        }
+
+        
+
+        #filterBtn {
+            background-color: #241253;
+            color: white;
+            border: 1px solid #42297d;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-family: sans-serif;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            width: 160px;
+        }
+
+        #filterBtn:hover {
+            background-color: #341d6d93;
+        }
+
+
+        #filterBtn .arrow {
+            display: inline-block;
+            transition: transform 0.3s ease;
+
+        }
+
+
+        #filterBtn.rotated .arrow {
+            transform: rotate(180deg);
+        }
+
+
+        .filter-wrapper {
+            text-align: right;
+            margin-right: 20px;
+            padding-right: 15px;
+            margin-top: 15px;
+
+        }
+
+
+        .status-card {
+            background-color: #f1f0ea;
+            margin-top: 20px;
+            border-radius: 24px;
+            padding: 24px;
+            color: #1e1b4b;
+            font-family: sans-serif;
+            width: 97%;
+            max-width: none;
+            box-sizing: border-box;
+
+        }
+
+        .header-main {
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            margin-bottom: 16px;
+        }
+
+        .button-container {
+            text-align: right;
+        }
+
+
+        .card-details {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.4s ease-out;
+
+        }
+
+        .detailsHeader {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            margin-top: 10px;
+            font-weight: bold;
+            margin-bottom: 12px;
+            color: #1e1b4b;
+        }
+
+        
+
+        .card-details.open {
+            max-height: 300px;
+        }
+
+
+        #viewDetailsBtn .btn-arrow {
+            display: inline-block;
+            transition: transform 0.3s;
+        }
+
+        #viewDetailsBtn.active .btn-arrow {
+            transform: rotate(180deg);
+        }
+
+
+        .itemRow {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 8px 0;
+        }
+
+        .lineSpacer {
+            flex-grow: 1;
+            border-bottom: 1px solid #94a3b8;
+            margin: 0 12px;
+        }
+
+        #logoutPopup{
+            position: fixed;
+            top: 0%;
+            left: 0%;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.4);
+        }
+    
+        #logoutText{
+            background-color: #f1f0ea;
+            padding: 30px;
+            border-radius: 20px;
+            width: 300px;
+            text-align: center;
+        }
+
+        #logoutButton{
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        #logoutButton button{
+            padding: 10px;
+            cursor: pointer;
+            border: none;
+            font-weight: bold;
+        }
+        
+        #yesBTN{
+            background:#d9534f;
+            color: white;
+        }
+        #noBTN{
+            background: #4caf50;
+            color: white;
+            margin-left: 2px;
+        }
+
+        #profilePopup{
+            position: fixed;
+            top: 0%;
+            left: 0%;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.4);
+        }
+
+        #profileShortDetails{
+            background-color: #f1f0ea;
+            padding: 30px;
+            border-radius: 20px;
+            width: 300px;
+            text-align: center;
+        }
+
+        #profileBTN{
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        #profileBTN button{
+            padding: 10px;
+            cursor: pointer;
+            border: 50px;
+            font-weight: bold;
+        }
+        #close{
+            color: red;
+        }
+
+        .hidden{
+            display: none !important;
+        }
+    
