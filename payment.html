@@ -144,12 +144,7 @@
     <script>
         window.addEventListener('DOMContentLoaded', () => {
             const retrievedDate = localStorage.getItem('savedDropOffDate');
-
-            if (retrievedDate) {
-                document.getElementById('dropOff_Date').textContent = retrievedDate;
-            } else {
-                document.getElementById('dropOff_Date').textContent = "Not selected";
-            }
+            document.getElementById('dropOff_Date').textContent = retrievedDate;
         });
     </script>
 </body>

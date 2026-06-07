@@ -101,12 +101,24 @@
             transform: scale(1.05);
             background-color: #e8e6df;
         }
+        .selectCollege{
+            background-color:#4CAF50;
+            color: white;
+        }
+        .selectCollege:hover{
+            transform: scale(1.05);
+            background-color: #124213;
+        }
 
         .dateSection {
             margin-top: 25px;
         }
 
-        .dateRow {
+        .dropOffRow {
+            display: flex;
+            gap: 12px;
+        }
+        .pickupRow{
             display: flex;
             gap: 12px;
         }
@@ -117,7 +129,24 @@
             align-items: center;
         }
 
-        .dateRow select {
+        .dropOffRow select {
+            background-color: #241253;
+            color: white;
+            border: none;
+            border-radius: 15px;
+            padding: 10px 20px;
+            font-size: 1rem;
+            cursor: pointer;
+            min-width: 80px;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml;utf8,<svg fill='white' height='24' viewBox='0 0 24 24' width='24' xmlns='http://www.w3.org/2000/svg'><path d='M7 10l5 5 5-5z'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            padding-right: 35px;
+        }
+
+        .pickupRow select{
             background-color: #241253;
             color: white;
             border: none;
@@ -289,8 +318,9 @@
 
     <button class="back" onclick="history.back()">&#60; Back</button>
 
-    <div class="leftContainer">
 
+    <div class="leftContainer">
+        
         <div id="formLayout">
 
             <h1>Booking Form</h1>
@@ -300,88 +330,102 @@
 
                 <div class="collegeCard">
                     <h3>Satria Jebat</h3>
-                    <p>Space : ?? unit</p>
-                    <button class="selectBtn">Select</button>
+                    <p>Space :<span id="jebatSize"></span> unit</p>
+                    <button class="selectBtn" onclick="selectCollege(this)">Select</button>
                 </div>
 
                 <div class="collegeCard">
                     <h3>Satria Tuah</h3>
-                    <p>Space : ?? unit</p>
-                    <button class="selectBtn">Select</button>
+                    <p>Space : <span id="tuahSize"></span> unit</p>
+                    <button class="selectBtn" onclick="selectCollege(this)">Select</button>
                 </div>
 
                 <div class="collegeCard">
                     <h3>Satria Kasturi</h3>
-                    <p>Space : ?? unit</p>
-                    <button class="selectBtn">Select</button>
+                    <p>Space : <span id="kasturiSize"></span> unit</p>
+                    <button class="selectBtn" onclick="selectCollege(this)">Select</button>
                 </div>
 
                 <div class="collegeCard">
                     <h3>Lestari A1 / A2</h3>
-                    <p>Space : ?? unit</p>
-                    <button class="selectBtn">Select</button>
+                    <p>Space : <span id="lestariSize"></span> unit</p>
+                    <button class="selectBtn" onclick="selectCollege(this)">Select</button>
                 </div>
 
             </div>
 
-            <div class="dateSection">
+            <div class="dropOffSection">
 
-                <h2>Drop-off date</h2>
+                <h2>Drop-off <span id="currentYear"></span></h2>
 
-                <div class="dateRow">
+                <div class="dropOffRow">
                     <div class="selectWrapper">
-                        <select id="formDay">
-                            <option>12</option>
+                        <select id="dropOffDay">
+                           
                         </select>
-                        <span>day</span>
+                        <span>Day of month</span>
                     </div>
 
                     <div class="selectWrapper">
-                        <select id="formMonth">
+                        <select id="dropOffMonth">
+                            <option>Jannuary</option>
+                            <option>February</option>
+                            <option>Mac</option>
                             <option>April</option>
+                            <option>May</option>
+                            <option>June</option>
+                            <option>July</option>
+                            <option>August</option>
+                            <option>September</option>
+                            <option>October</option>
+                            <option>November</option>
+                            <option>December</option>
                         </select>
                         <span>month</span>
                     </div>
 
-                    <div class="selectWrapper">
+                    <!--<div class="selectWrapper">
                         <select id="formYear">
                             <option>2026</option>
                         </select>
                         <span>year</span>
-                    </div>
+                    </div>-->
                 </div>
 
             </div>
 
-            <div class="dateSection">
+            <div class="pickupSection">
 
                 <h2>Pickup date</h2>
 
-                <div class="dateRow">
+                <div class="pickupRow">
                     <div class="selectWrapper">
-                        <select id="formDay">
-                            <option>12</option>
+                        <select id="pickupDay">
+
                         </select>
-                        <span>day</span>
+                        <span>Day of month</span>
                     </div>
 
                     <div class="selectWrapper">
-                        <select id="formMonth">
+                        <select id="pickupMonth">
+                            <option>Jannuary</option>
+                            <option>February</option>
+                            <option>Mac</option>
                             <option>April</option>
+                            <option>May</option>
+                            <option>June</option>
+                            <option>July</option>
+                            <option>August</option>
+                            <option>September</option>
+                            <option>October</option>
+                            <option>November</option>
+                            <option>December</option>
                         </select>
                         <span>month</span>
                     </div>
 
-                    <div class="selectWrapper">
-                        <select id="formYear">
-                            <option>2026</option>
-                        </select>
-                        <span>year</span>
-                    </div>
-                </div>
-
             </div>
-
+            </div>
         </div>
 
         <div id="itemDetailsContainer">
@@ -508,14 +552,84 @@
         </div>
 
 
-        <button type="button" class="submitBtn" onclick="window.location.href='payment.html'">
+        <button type="submit" class="submitBtn" onclick="event.preventDefault(); submitBooking()">
             Submit
         </button>
-
+        
     </div>
 
     <script>
+        //College selection
+        const jebat = 150;
+        const tuah = 150;
+        const kasturi = 150;
+        const lestari = 150;
+        let selectedCollege ='';
+        
+        document.getElementById('jebatSize').innerHTML = jebat;
+        document.getElementById('tuahSize').innerHTML = tuah;
+        document.getElementById('kasturiSize').innerHTML = kasturi;
+        document.getElementById('lestariSize').innerHTML = lestari;
 
+        function selectCollege(selected){
+            const collegeBTN = document.querySelectorAll('.selectBtn');
+
+            collegeBTN.forEach(btn => {
+                btn.textContent = "Select";
+                btn.classList.remove('selectCollege');
+            });
+
+            selected.textContent = "Selected";
+            selected.classList.add('selectCollege');
+
+            selectedCollege = selected.parentElement.querySelector('h3').textContent;
+
+        }
+
+        //Drop and pickup date
+        const Curryear = new Date().getFullYear();
+        document.getElementById('currentYear').innerHTML = Curryear;
+
+        const dropDay = document.getElementById('dropOffDay');
+        const dropMonth = document.getElementById('dropOffMonth');
+        const pickDay = document.getElementById('pickupDay');
+        const pickMonth = document.getElementById('pickupMonth');
+
+
+        function getDayMonthYear(month){
+            return new Date(Curryear,month +1, 0).getDate();
+        }
+        function calculateDays(dropday,dropmonth){
+
+            const day = getDayMonthYear(dropmonth);
+            dropday.innerHTML='';
+            for(let i = 1; i<=day; i++){
+                const option = document.createElement('option');
+                option.value=i;
+                option.textContent =i;
+                dropday.appendChild(option);
+            }
+        }
+        function getFullDate(daySelect, monthSelect){
+            const year = Curryear;
+            const month = monthSelect.selectedIndex;
+            const day = parseInt(daySelect.value);
+
+            return new Date(year,month,day);
+        }
+        calculateDays(dropDay,dropMonth.selectedIndex);
+        calculateDays(pickDay,pickMonth.selectedIndex);
+
+        dropMonth.addEventListener("change", () => {
+                calculateDays(dropDay, dropMonth.selectedIndex);
+        });
+
+        pickMonth.addEventListener("change", () => {
+                calculateDays(pickDay, pickMonth.selectedIndex);
+        });
+
+
+        
         const chooseBtn = document.querySelector(".chooseBtn");
         const dropdown = document.querySelector(".bagDropdown");
 
@@ -537,7 +651,7 @@
             boxDropdown.classList.toggle("show");
         });
 
-        function saveDateAndGo() {
+        /*function saveDateAndGo() {
             
             const day = document.getElementById('formDay').value;
             const month = document.getElementById('formMonth').value;
@@ -546,6 +660,30 @@
             const combinedDate = `${day} ${month} ${year}`;
 
             localStorage.setItem('savedDropOffDate', combinedDate);
+
+            window.location.href = 'payment.html';
+        }*/
+
+        function submitBooking(){
+
+            const day = dropDay.value;
+            const month = dropMonth.value;
+            const dropDate = getFullDate(dropDay,dropMonth);
+            const pickupDate = getFullDate(pickDay,pickMonth);
+
+            if(selectedCollege === ""){
+                 alert("Please select a residential college.");
+                return;
+            }
+            if(pickupDate <= dropDate){
+                alert("Error please select pick up date after drop off");
+                return;
+            }
+            const combinedDate = `${day} ${month} ${Curryear}`;
+
+
+            localStorage.setItem('savedDropOffDate', combinedDate);
+
 
             window.location.href = 'payment.html';
         }
