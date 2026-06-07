@@ -127,7 +127,10 @@
                 <p>
                     Drop-off Date: 
                     <span id="dropOff_Date">Loading...</span></p>
-
+                <p>
+                    Pick-up Date:
+                    <span id="pickUp_Date"></span>
+                </p>
                 
                 <p>
                     Residential College: 
@@ -144,7 +147,10 @@
     <script>
         window.addEventListener('DOMContentLoaded', () => {
             const retrievedDate = localStorage.getItem('savedDropOffDate');
+            const pickDate = localStorage.getItem('savedpickupDate');
             document.getElementById('dropOff_Date').textContent = retrievedDate;
+            document.getElementById('pickUp_Date').textContent = pickDate;
+
         });
     </script>
 </body>
