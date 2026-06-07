@@ -14,7 +14,7 @@
         text-shadow: 1px 1.2px 0px rgba(0, 0, 0, 0.395);
         }
 
-         #userName {
+        #userName {
             text-align: right;
             margin-top: 20px;
             margin-right: 20px;
@@ -30,12 +30,33 @@
             cursor: pointer;
         }
 
+        #profileContainer{
+            position: relative;
+            display: inline-block;
+        }
         #profileSelect{
             position: absolute;
-            right: 23px;
-            top: 50px;
+            right: 0;
+            top: 100%;
             background-color: #E8E9DE;
-            border: 0px;
+            border: 0;
+            border-radius: 10px;
+            min-width: 120px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            
+            opacity: 0;
+            transform: translateY(0px);
+            pointer-events: none;
+
+            transition:
+                max-height 0.3s ease,
+                opacity 0.3s ease;
+        }
+
+        #profileSelect.show{
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
         }
 
         #profileSelect button{

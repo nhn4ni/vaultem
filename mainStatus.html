@@ -28,12 +28,17 @@
         </div>
 
         <div class="rightcontainer">
-            <p id="userName">Welcome, <span id="currentName">Guest</span><img id="userImage" src="/image/user.png" width="20px" height="20px" onclick="profileMenu()"></p>
-            <div id="profileSelect" class="hidden">
-                <button onclick="showProfile();">Profile</button>
-                <button onclick="window.location.href='settings.html'">Settings?</button>
-                <button onclick="showLog();">Logout</button>
-            </div>
+            <div id="userName">
+                     Welcome, <span id="currentName">Guest</span>
+            <span id="profileContainer">
+                    <img id="userImage" src="/image/user.png" width="20px" height="20px" onclick="profileMenu()">
+                <div id="profileSelect">
+                    <button onclick="showProfile();">Profile</button>
+                    <button onclick="window.location.href='settings.html'">Settings</button>
+                    <button onclick="showLog();">Logout</button>
+                </div>
+            </span>
+        </div>
             <h1>Status</h1>
 
             <div class="filter-wrapper">
@@ -172,7 +177,7 @@
         });
 
         function profileMenu(){
-            document.getElementById('profileSelect').classList.toggle('hidden');
+            document.getElementById('profileSelect').classList.toggle('show');
         }
 
         function showLog(){
