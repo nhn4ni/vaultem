@@ -724,11 +724,11 @@
         let bucket = parseInt(document.getElementById('bucketInput').value)|| 0;
         let other = parseInt(document.getElementById('otherQty').value) || 0;
         
-        total = (bigBag * 5) + (medBag * 3) + (smallBag * 2);
-        total = total + (largeLug * 8) + (medLug * 5) + (smallLug * 3);
-        total = total + (bigBox * 7) + (medBox * 4) + (smallBox * 2.5);
-        total = total + (bucket * 1.5);
-        total = total + (other * 10);
+        total = (bigBag * 0.5) + (medBag * 0.5) + (smallBag * 0.5);
+        total = total + (largeLug * 0.5) + (medLug * 0.5) + (smallLug * 0.5);
+        total = total + (bigBox * 0.5) + (medBox * 0.5) + (smallBox * 0.5);
+        total = total + (bucket * 0.5);
+        total = total + (other * 0.5);
         
         totalUnits = bigBag + medBag + smallBag + largeLug + medLug + smallLug + bigBox + medBox + smallBox + bucket + other;
         
