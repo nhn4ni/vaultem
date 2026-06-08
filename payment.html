@@ -49,7 +49,7 @@
 
     .paymentBox {
         width: 65%;
-        height: 55%;
+        min-height: 55%;
         background-color: #241253;
         color: #E8E9DE;
         border: 1px solid #ccc;
@@ -106,6 +106,25 @@
     #payBtn {
         margin-top: 10px;
     }
+
+    #payMethod {
+        /* display: none;
+        opacity:0; */
+        max-height: 0;
+        opacity: 0;
+        overflow: hidden;
+        transform: translateY(-10px);
+        transition: all 0.3s ease;
+    }
+
+    #payMethod.show {
+        /* display: block; */
+        opacity: 1;
+        max-height: 300px;
+        transform: translateY(0);
+    }
+
+    
 </style>
 
 <body>
@@ -122,28 +141,46 @@
             <div class="bookingSummary">
                 <h3>Booking Summary</h3>
                 <p>
-                    Total Item: 
-                    <span id="totalItem">3</span></p>
+                    Total Item:
+                    <span id="totalItem">3</span>
+                </p>
                 <p>
-                    Drop-off Date: 
-                    <span id="dropOff_Date">Loading...</span></p>
+                    Drop-off Date:
+                    <span id="dropOff_Date">Loading...</span>
+                </p>
                 <p>
                     Pick-up Date:
                     <span id="pickUp_Date"></span>
                 </p>
-                
+
                 <p>
-                    Residential College: 
-                    <span id="resCollege">Lestari B</span></p>
+                    Residential College:
+                    <span id="resCollege">Lestari B</span>
+                </p>
             </div>
 
             <div class="totalSection">
                 <p>Total:</p>
                 <p><span id="totalAmount">RM 0.00</span></p>
-                <button id="payBtn">Pay</button>
+                <button id="payBtn" onclick="toggleMenu()">Pay</button>
             </div>
+            <div id="payMethod">
+                <p>Select your payment method:</p>
+
+                <input type="radio" id="banking" name="payment">
+                <label for="banking">Online Banking</label><br>
+
+                <input type="radio" id="card" name="payment">
+                <label for="card">Credit/Debit Card</label><br>
+
+                <input type="radio" id="qr" name="payment">
+                <label for="qr">QR</label>
+            </div>
+
         </div>
     </div>
+
+
     <script>
         window.addEventListener('DOMContentLoaded', () => {
             const retrievedDate = localStorage.getItem('savedDropOffDate');
@@ -152,6 +189,10 @@
             document.getElementById('pickUp_Date').textContent = pickDate;
 
         });
+
+        function toggleMenu() {
+            document.getElementById("payMethod").classList.toggle("show");
+        }
     </script>
 </body>
 
