@@ -44,11 +44,11 @@
     h2 {
         text-align: center;
         margin-top: 0;
-        /* Prevents default heading margins from breaking alignment */
+
     }
 
     .paymentBox {
-        width: 65%;
+        width: 350px;
         min-height: 55%;
         background-color: #241253;
         color: #E8E9DE;
@@ -56,16 +56,13 @@
         border-radius: 20px;
         padding: 20px;
         box-sizing: border-box;
-        /* Crucial to keep padding from making the box overflow */
-
-        /* 1. Turn the card into a flex column */
         display: flex;
         flex-direction: column;
         align-items: flex-start;
-        /* Keeps top contents left-aligned */
+
     }
 
-    /* Force the heading to stay centered horizontally across the box width */
+
     .paymentBox h2 {
         width: 100%;
     }
@@ -75,15 +72,18 @@
         font-size: 1.2rem;
     }
 
-    #payBtn {
+    #payBtn,
+    #pay {
         background-color: #E8E9DE;
-        width: 30%;
+        width: 80%;
         padding: 10px;
         border-style: none;
         border-radius: 25px;
+        /* align-self: center; */
     }
 
-    #payBtn:hover {
+    #payBtn:hover,
+    #pay:hover {
         background-color: #d6d7ca;
         cursor: pointer;
         transform: translateY(-2px);
@@ -124,7 +124,58 @@
         transform: translateY(0);
     }
 
-    
+    .popupOverlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+
+        background: rgba(0, 0, 0, 0.4);
+        
+
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        opacity: 0;
+        visibility: hidden;
+    }
+
+    .popupOverlay.show {
+        opacity: 1;
+        visibility: visible;
+    }
+
+    .popupBox {
+        background: white;
+        color: #241253;
+
+        padding: 30px;
+        border-radius: 20px;
+
+        width: 320px;
+        text-align: center;
+
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+
+    }
+
+    .popupOverlay.show .popupBox {
+        transform: scale(1);
+    }
+
+    #home {
+        margin-top: 15px;
+        padding: 10px 20px;
+
+        border: none;
+        border-radius: 20px;
+
+        background: #241253;
+        color: white;
+
+        cursor: pointer;
+    }
 </style>
 
 <body>
@@ -161,8 +212,8 @@
 
             <div class="totalSection">
                 <p>Total:</p>
-                <p><span id="totalAmount">RM 0.00</span></p>
-                <button id="payBtn" onclick="toggleMenu()">Pay</button>
+                <p><span id="totalAmount">RM 1.50</span></p>
+                <button id="payBtn" onclick="toggleMenu()">Select Payment Method</button>
             </div>
             <div id="payMethod">
                 <p>Select your payment method:</p>
@@ -174,9 +225,20 @@
                 <label for="card">Credit/Debit Card</label><br>
 
                 <input type="radio" id="qr" name="payment">
-                <label for="qr">QR</label>
+                <label for="qr">QR</label><br><br>
+                <button id="pay">Pay Now</button>
             </div>
 
+        </div>
+
+        <div id="payPopup" class="popupOverlay">
+            <div class="popupBox">
+                <p>Your payment of RM0.50 was successful!</p>
+
+                <button type="button" id="home" onclick="window.location.href='mainStatus.html'">
+                    Go back home
+                </button>
+            </div>
         </div>
     </div>
 
@@ -193,6 +255,10 @@
         function toggleMenu() {
             document.getElementById("payMethod").classList.toggle("show");
         }
+
+        document.getElementById("pay").addEventListener("click", function () {
+            document.getElementById("payPopup").classList.add("show");
+        });
     </script>
 </body>
 
