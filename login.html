@@ -22,7 +22,7 @@
 
         <div class="rightcontainer">
             <h1>Log in</h1>
-            <form onsubmit="event.preventDefault(); login();">
+            <form method="post" action="login.php">
                 <!--<div class="nameGenderRow">
                 <input type="text" placeholder="Name">
                     <select><option>Gender</option>
@@ -30,8 +30,8 @@
                         <option value="female">Female</option>
                     </select>
                 </div>-->
-                <input type="email" id="userEmail" placeholder="Student Email"> <!--type email tmbh .com -->
-                <input type="password" id="userPassword" placeholder="Password"> <!--type password, auto censor -->
+                <input type="email" name="userEmail" id="userEmail" placeholder="Student Email"> <!--type email tmbh .com -->
+                <input type="password" name="userPassword" id="userPassword" placeholder="Password"> <!--type password, auto censor -->
                 <!--<input type="password" placeholder="Confirm Password">-->
                 <button type="submit">
                 Log in
