@@ -22,6 +22,9 @@ $sql = "SELECT * FROM student WHERE Student_Mail='$email'";
 
         // Guna password_verify untuk semak kata laluan
         if ($password == $user['Student_Password']) {
+            $_SESSION['Student_ID']=$user['Student_ID'];
+            $_SESSION['Student_Name']=$user['Student_Name'];
+            $_SESSION['Residential_ID']=$user['Residential_ID'];
             include("mainStatus.html");
         } else {
             echo "Login Fail: Password salah";
