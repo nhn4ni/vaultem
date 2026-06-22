@@ -1,7 +1,4 @@
-
-       
-
-        * {
+* {
             font-family: 'Courier New', Courier, monospace;
             box-sizing: border-box;
         }
@@ -98,12 +95,11 @@
         }
 
         #wrapper {
-            display: flex;
-            height: 100vh;
-            width: 100vw;
-
-            overflow: hidden;
-        }
+    display: flex;
+    height: 100vh;  /* Lock height to screen height */
+    width: 100vw;
+    overflow: hidden; 
+}
 
         .leftcontainer {
             flex: 1;
@@ -123,30 +119,36 @@
         }
 
         .rightcontainer {
-            flex: 2;
-            background-color: #241253;
-            color: #E8E9DE;
-            border-top-left-radius: 40px;
-            border-bottom-left-radius: 40px;
-            padding-top: 10px;
-            padding-left: 50px;
-            display: flex;
-            flex-direction: column;
-            animation: slideLeft 1.0s ease-in-out forwards;
-        }
+    flex: 2;
+    background-color: #241253;
+    color: #E8E9DE;
+    border-top-left-radius: 40px;
+    border-bottom-left-radius: 40px;
+    padding-top: 10px;
+    padding-left: 50px;
+    display: flex;
+    flex-direction: column;
+    animation: slideLeft 1.0s ease-in-out forwards;
+    
+    height: 100vh;    
+    overflow-y: auto; 
+    padding-bottom: 40px;
+}
 
         #booking {
-            width: 90%;
-            background-color: #241253;
-            border: 20px;
-            margin-top: 600px;
-            margin-bottom: 5%;
-            padding: 15px 15px;
-            font-size: 1.1rem;
-            border-radius: 25px;
-            font-weight: bold;
-            color: #E8E9DE
-        }
+    width: 90%;
+    background-color: #241253;
+    border: 20px;
+    
+    margin-top: auto; 
+    margin-bottom: 5%; 
+    
+    padding: 15px 15px;
+    font-size: 1.1rem;
+    border-radius: 25px;
+    font-weight: bold;
+    color: #E8E9DE;
+}
 
         #booking:hover {
             background-color: #37216d;
@@ -226,8 +228,11 @@
             max-height: 0;
             overflow: hidden;
             transition: max-height 0.4s ease-out;
+           
 
         }
+
+        
 
         .detailsHeader {
             display: flex;
@@ -243,15 +248,16 @@
 
         .card-details.open {
             max-height: 300px;
+            
         }
 
 
-        #viewDetailsBtn .btn-arrow {
+        .viewDetailsBtn .btn-arrow {
             display: inline-block;
             transition: transform 0.3s;
         }
 
-        #viewDetailsBtn.active .btn-arrow {
+        .viewDetailsBtn.active .btn-arrow {
             transform: rotate(180deg);
         }
 
@@ -350,4 +356,3 @@
         .hidden{
             display: none !important;
         }
-    
