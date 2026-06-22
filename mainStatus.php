@@ -1,3 +1,42 @@
+<?php
+
+$conn = new mysqli("localhost","root","","vaultemdb");
+
+if($conn->connect_error)
+    {
+        die ("Connection Failed");
+    }
+
+    $sql = "
+    SELECT 
+    b.Booking_ID,
+    b.DropOff_Date,
+    b.Pickup_Date,
+    b.Booking_Status,
+    s.Student_Name,
+    r.Residential_Block,
+    SUM(i.Quantity) AS TotalItem,
+    SUM(i.Quantity * i.Price) AS TotalFee
+
+FROM booking b
+
+LEFT JOIN student s
+ON b.Student_ID = s.Student_ID
+
+LEFT JOIN residential_college r
+ON s.Residential_ID = r.Residential_ID
+
+LEFT JOIN item i
+ON b.Booking_ID = i.Booking_ID
+
+GROUP BY b.Booking_ID
+";
+
+$result = $conn->query($sql);
+
+?>
+
+
 <!DOCTYPE html>
 <html lang="en">
 <link rel="stylesheet" href="status.css" type="text/css">
@@ -29,7 +68,7 @@
 
         <div class="rightcontainer">
             <div id="userName">
-                     Welcome, <span id="currentName">Guest</span>
+                    Welcome, <span id="currentName">Guest</span>
             <span id="profileContainer">
                     <img id="userImage" src="/image/user.png" width="20px" height="20px" onclick="profileMenu()">
                 <div id="profileSelect">
@@ -49,53 +88,55 @@
                 </button>
             </div>
 
-            <div class="status-card">
-                <div class="card-header">
-                    <div class="header-main">
-                        <span class="order-id">ID: 00156</span>
-                        <span class="status-text">To be dropped off</span>
-                    </div>
+            <?php while($row = $result->fetch_assoc())
+            {
+                ?>
+                <div class = "status-card">
+                    <div class ="card-header">
+                        <div class = "header-main">
+                            <span class = "order-id">
 
-                    <div class="summary-info">
-                        <p>Drop-off date: 16 May 2026</p>
-                        <p>Pick-up date: 16 June 2026</p>
-                        <p>Item quantity: 3</p>
-                        <p>College: Lestari B</p>
-                        <p>Total fee: RM1.50</p>
-                    </div>
+                            ID: 
+                            <?php echo $row['Booking_ID'];?>
+                            </span>
+                        </div>
 
-                    <div class="button-container">
-                        <button id="viewDetailsBtn">
-                            <span class="btn-text">View details</span>
-                            <span class="btn-arrow">&#9662;</span>
-                        </button>
-                    </div>
-                </div>
+        <div class="summary-info">
 
-                <div class="card-details" id="detailsPanel">
-                    <div class="details-content">
-                        <div class="detailsHeader">
-                            <span>Item details</span>
-                            <span>Quantity</span>
-                        </div>
-                        <div class="itemRow">
-                            <span>Bag small</span>
-                            <span class="lineSpacer"></span>
-                            <span>1</span>
-                        </div>
-                        <div class="itemRow">
-                            <span>Bucket/pail</span>
-                            <span class="lineSpacer"></span>
-                            <span>1</span>
-                        </div>
-                        <div class="itemRow">
-                            <span>Fan</span>
-                            <span class="lineSpacer"></span>
-                            <span>1</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <p>
+                Drop-off date:
+                <?php echo $row['DropOff_Date']; ?>
+            </p>
+
+            <p>
+                Pick-up date:
+                <?php echo $row['Pickup_Date']; ?>
+            </p>
+
+            <p>
+                Item quantity:
+                <?php echo $row['TotalItem']; ?>
+            </p>
+
+            <p>
+                College:
+                <?php echo $row['Residential_Block']; ?>
+            </p>
+
+            <p>
+                Total fee:
+                RM <?php echo $row['TotalFee']; ?>
+            </p>
+
+        </div>
+
+    </div>
+
+</div>
+
+<?php } ?>
+
+
 
         </div>
     </div>
@@ -105,10 +146,10 @@
             <p>Are you sure you want to logout?</p>
         
 
-          <div id="logoutButton">
+        <div id="logoutButton">
             <button id="yesBTN" onclick="logout();">Yes</button>
             <button id="noBTN" onclick="showLog();">No</button>
-          </div>
+        </div>
         </div>
     </div>
 

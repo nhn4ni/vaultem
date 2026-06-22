@@ -261,7 +261,7 @@ Pay Now
             <div class="popupBox">
                 <p>Your payment of RM0.50 was successful!</p>
 
-                <button type="button" id="home" onclick="window.location.href='mainStatus.html'">
+                <button type="button" id="home" onclick="window.location.href='mainStatus.php'">
                     Go back home
                 </button>
             </div>

@@ -94,7 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     // Success message
     echo "<h2>Booking Successful!</h2>";
-    echo "<a href='form.html'>Back to form</a>";
+    echo "<meta http-equiv='refresh' content='3;URL=mainStatus.php'>";
 
 } else {
     // Redirect to form if accessed directly

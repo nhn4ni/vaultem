@@ -352,6 +352,7 @@
 
     <button class="back" onclick="history.back()">&#60; Back</button>
 
+    <form id="bookingForm" method = "POST" action = "form.php">
 
     <div class="leftContainer">
         
@@ -365,31 +366,37 @@
                 <div class="collegeCard">
                     <h3>Satria Jebat</h3>
                     <p>Space :<span id="jebatSize"></span> unit</p>
-                    <button class="selectBtn" onclick="selectCollege(this, 'Satria Jebat')">Select</button>
+                    <button type = "button" class = "selectBtn"
+                    onclick="selectCollege(this, 'Satria Jebat')">Select</button>
                 </div>
 
                 <div class="collegeCard">
                     <h3>Satria Tuah</h3>
                     <p>Space : <span id="tuahSize"></span> unit</p>
-                    <button class="selectBtn" onclick="selectCollege(this, 'Satria Tuah')">Select</button>
+                    <button type="button" class="selectBtn"
+                    onclick="selectCollege(this, 'Satria Tuah')">Select</button>
+                    
                 </div>
 
                 <div class="collegeCard">
                     <h3>Satria Kasturi</h3>
                     <p>Space : <span id="kasturiSize"></span> unit</p>
-                    <button class="selectBtn" onclick="selectCollege(this, 'Satria Kasturi')">Select</button>
+                    <button type="button" class="selectBtn"
+                    onclick="selectCollege(this, 'Satria Kasturi')">Select</button>
                 </div>
 
-                 <div class="collegeCard">
+                <div class="collegeCard">
                     <h3>Satria Lekir</h3>
                     <p>Space : <span id="lekirSize"></span> unit</p>
-                    <button class="selectBtn" onclick="selectCollege(this, 'Satria Lekir')">Select</button>
+                    <button type="button" class="selectBtn"
+                    onclick="selectCollege(this, 'Satria Lekir')">Select</button>
                 </div>
 
-                 <div class="collegeCard">
+                <div class="collegeCard">
                     <h3>Satria Lekiu</h3>
                     <p>Space : <span id="lekiuSize"></span> unit</p>
-                    <button class="selectBtn" onclick="selectCollege(this, 'Satria Lekiu')">Select</button>
+                    <button type="button" class="selectBtn"
+                    onclick="selectCollege(this, 'Satria Lekiu')">Select</button>
                 </div>
 
                 <div class="collegeCard">
@@ -407,14 +414,13 @@
                 <div class="dropOffRow">
                     <div class="selectWrapper">
                         <select id="dropOffDay">
-                           
                         </select>
                         <span>Day of month</span>
                     </div>
 
                     <div class="selectWrapper">
                         <select id="dropOffMonth">
-                            <option>Jannuary</option>
+                            <option>January</option>
                             <option>February</option>
                             <option>Mac</option>
                             <option>April</option>
@@ -454,9 +460,9 @@
 
                     <div class="selectWrapper">
                         <select id="pickupMonth">
-                            <option>Jannuary</option>
+                            <option>January</option>
                             <option>February</option>
-                            <option>Mac</option>
+                            <option>March</option>
                             <option>April</option>
                             <option>May</option>
                             <option>June</option>
@@ -560,6 +566,7 @@
             <span>Others</span>
             <input id="otherQty" type="number" min="0" value="0">
         </div>
+
     </div>
 
     </div>
@@ -576,11 +583,12 @@
         </label>
          </div>
 
-        <button type="submit" class="submitBtn" onclick="event.preventDefault(); submitBooking()">
-            Submit
-        </button>
+        <button type="submit" class="submitBtn">Submit</button>
+       
         
     </div>
+    </form>
+    
 
     <script>
         //College selection
@@ -836,10 +844,11 @@
 
             localStorage.setItem('savedDropOffDate', combinedDate);
             localStorage.setItem('savedpickupDate', combinedDate2);
-            localStorage.setItem('TotalPrice',total);
+            localStorage.setItem('TotalPrice',total.total);
 
             if(emergencyChecked) {
                 alert(" Emergency will hightlight your booking for staff, so it may take two or thre days");
+                total.total += 10;
             }   
             window.location.href = 'payment.html';
         }
