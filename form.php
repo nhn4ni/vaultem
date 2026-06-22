@@ -14,6 +14,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $dropOffDate = $_POST['dropOffDate'] ?? '';
     $pickupDate = $_POST['pickupDate'] ?? '';
 
+    // Set booking priority based on emergency checkbox
+    $bookingPriority = isset($_POST['emergency']) ? 'High' : 'Normal';
+
     // Quantities for items
     $bigBagQty = (int)($_POST['bigBagQty'] ?? 0);
     $medBagQty = (int)($_POST['medBagQty'] ?? 0);
@@ -33,8 +36,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Calculate total fee based on total items
     $totalPrice = $totalItems * 0.5;
 
-    // Insert into booking
-    mysqli_query($conn, "INSERT INTO booking (Booking_Date, DropOff_Date, Pickup_Date, Booking_Status, Booking_Priority, Staff_ID, Student_ID) VALUES (NOW(), '$dropOffDate', '$pickupDate', 'Pending', 'Normal', 1, 1)");
+    // Insert into booking, including Booking_Priority
+    $sql_booking = "INSERT INTO booking (Booking_Date, DropOff_Date, Pickup_Date, Booking_Status, Booking_Priority, Staff_ID, Student_ID) 
+                    VALUES (NOW(), '$dropOffDate', '$pickupDate', 'Pending', '$bookingPriority', 1, 1)";
+    mysqli_query($conn, $sql_booking);
     $booking_id = mysqli_insert_id($conn);
 
     // Insert into payment
@@ -63,19 +68,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     foreach ($items as $item) {
         if ($item['size'] > 0) {
-            mysqli_query($conn, "INSERT INTO item (Item_Name, Item_Category, Item_Size, Quantity, Price, Space_ID, Booking_ID) VALUES ('" . $item['name'] . "', 'Bag', 'Size', " . $item['size'] . ", 0.5, 1, $booking_id)");
+            mysqli_query(
+                $conn,
+                "INSERT INTO item (Item_Name, Item_Category, Item_Size, Quantity, Price, Space_ID, Booking_ID) 
+                 VALUES ('" . $item['name'] . "', 'Bag', 'Size', " . $item['size'] . ", 0.5, 1, $booking_id)"
+            );
         }
     }
 
     // Insert into storespace for buckets and other items
     if ($bucketQty > 0) {
-        mysqli_query($conn, "INSERT INTO storespace (Space_ID, Residential_ID, Size, Status, Booking_ID) VALUES (1, $residential_id, $bucketQty, 'Occupied', $booking_id)");
+        mysqli_query(
+            $conn,
+            "INSERT INTO storespace (Space_ID, Residential_ID, Size, Status, Booking_ID) 
+             VALUES (1, $residential_id, $bucketQty, 'Occupied', $booking_id)"
+        );
     }
     if ($otherQty > 0) {
-        mysqli_query($conn, "INSERT INTO storespace (Space_ID, Residential_ID, Size, Status, Booking_ID) VALUES (2, $residential_id, $otherQty, 'Occupied', $booking_id)");
+        mysqli_query(
+            $conn,
+            "INSERT INTO storespace (Space_ID, Residential_ID, Size, Status, Booking_ID) 
+             VALUES (2, $residential_id, $otherQty, 'Occupied', $booking_id)"
+        );
     }
 
-    // Redirect or display success message
+    // Success message
     echo "<h2>Booking Successful!</h2>";
     echo "<a href='form.html'>Back to form</a>";
 
