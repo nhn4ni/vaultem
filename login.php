@@ -27,12 +27,12 @@ $sql = "SELECT * FROM student WHERE Student_Mail='$email'";
             $_SESSION['Residential_ID']=$user['Residential_ID'];
             include("mainStatus.html");
         } else {
-            echo "Login Fail: Password salah";
+            echo "Login Fail: Wrong password";
             echo "<meta http-equiv='refresh' content='3;URL=login.html'>";
         }
     }
      else {
-        echo "Login Fail: Username tidak wujud";
+        echo "Login Fail: Username not found";
         echo "<meta http-equiv='refresh' content='3;URL=login.html'>";
     }
 ?>
