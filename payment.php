@@ -216,18 +216,44 @@
                 <button id="payBtn" onclick="toggleMenu()">Select Payment Method</button>
             </div>
             <div id="payMethod">
-                <p>Select your payment method:</p>
 
-                <input type="radio" id="banking" name="payment">
-                <label for="banking">Online Banking</label><br>
+<form action="payment_process.php" method="POST">
 
-                <input type="radio" id="card" name="payment">
-                <label for="card">Credit/Debit Card</label><br>
+<p>Select your payment method:</p>
 
-                <input type="radio" id="qr" name="payment">
-                <label for="qr">QR</label><br><br>
-                <button id="pay">Pay Now</button>
-            </div>
+<input type="radio" id="banking"
+name="payment_method"
+value="Online Banking" required>
+
+<label for="banking">Online Banking</label><br>
+
+<input type="radio" id="card"
+name="payment_method"
+value="Credit/Debit Card">
+
+<label for="card">Credit/Debit Card</label><br>
+
+<input type="radio" id="qr"
+name="payment_method"
+value="QR">
+
+<label for="qr">QR</label><br><br>
+
+<input type="hidden"
+name="amount"
+value="1.50">
+
+<input type="hidden"
+name="booking_id"
+value="1">
+
+<button type="submit" id="pay">
+Pay Now
+</button>
+
+</form>
+
+</div>
 
         </div>
 
