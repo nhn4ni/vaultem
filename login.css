@@ -1,9 +1,10 @@
 *{
     font-family: 'Courier New', Courier, monospace;box-sizing: border-box;
+    
 }
 
 body {
-    /* background-color: #E8E9DE; */
+    background-color: #E8E9DE; 
     margin:0px;
 }
 
@@ -36,6 +37,7 @@ p{
     height: 100vh;
     width: 100vw; /*vw - viewport width  */
     overflow: hidden;
+    
 }
 
 .leftcontainer{

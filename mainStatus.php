@@ -1,41 +1,88 @@
 <?php
 session_start();
 
-$conn = new mysqli("localhost", "root", "", "utem_accommodation");
+// ── Auth guard ───────────────────────────────────────────────────────────────
+if (!isset($_SESSION['Student_ID'])) {
+    header("Location: studentMAIN.html");
+    exit();
+}
 
+$conn = new mysqli("localhost", "root", "", "utem_accommodation");
 if ($conn->connect_error) {
     die("Connection Failed: " . $conn->connect_error);
 }
 
-// 1. Determine sort order safely
-$order = "DESC";
-if (isset($_GET['sort']) && $_GET['sort'] == "old") {
-    $order = "ASC";
+// ── Handle Booking Cancellation (Permanent Removal) ──────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_booking_id'])) {
+    $cancelID = intval($_POST['cancel_booking_id']);
+    $student_id = $_SESSION['Student_ID'];
+
+    // 1. Verify booking belongs to this student AND status is pending
+    $verifySql = "SELECT b.Booking_ID FROM booking b 
+                  LEFT JOIN payment p ON b.Booking_ID = p.Booking_ID
+                  WHERE b.Booking_ID = ? 
+                    AND b.Student_ID = ? 
+                    AND LOWER(b.Booking_Status) = 'pending' 
+                    AND (p.Payment_Status IS NULL OR LOWER(p.Payment_Status) != 'y')";
+                    
+    $verifyStmt = $conn->prepare($verifySql);
+    $verifyStmt->bind_param("is", $cancelID, $student_id);
+    $verifyStmt->execute();
+    $verifyResult = $verifyStmt->get_result();
+
+    if ($verifyResult->num_rows > 0) {
+        // 2. Delete any records inside 'payment' linked to this booking
+        $deletePay = $conn->prepare("DELETE FROM payment WHERE Booking_ID = ?");
+        $deletePay->bind_param("i", $cancelID);
+        $deletePay->execute();
+        $deletePay->close();
+
+        // 3. Delete any records inside 'item' linked to this booking
+        $deleteItems = $conn->prepare("DELETE FROM item WHERE Booking_ID = ?");
+        $deleteItems->bind_param("i", $cancelID);
+        $deleteItems->execute();
+        $deleteItems->close();
+
+        // 4. Safely delete the parent row from 'booking'
+        $deleteBooking = $conn->prepare("DELETE FROM booking WHERE Booking_ID = ?");
+        $deleteBooking->bind_param("i", $cancelID);
+        $deleteBooking->execute();
+        $deleteBooking->close();
+        
+        header("Location: mainStatus.php" . (isset($_GET['sort']) ? "?sort=" . $_GET['sort'] : ""));
+        exit();
+    }
+    $verifyStmt->close();
 }
 
-// 2. Base Query to fetch bookings
+// ── Sort order ───────────────────────────────────────────────────────────────
+$order = (isset($_GET['sort']) && $_GET['sort'] === 'old') ? 'ASC' : 'DESC';
+
+// ── Fetch bookings for the logged-in student only ────────────────────────────
+$student_id   = $_SESSION['Student_ID'];
+$studentIdEsc = $conn->real_escape_string($student_id);
+
 $sql = "
-    SELECT 
+    SELECT
         b.Booking_ID,
         b.DropOff_Date,
         b.Pickup_Date,
         b.Booking_Status,
+        b.Booking_Priority,
         s.Student_Name,
-        r.Residential_Block,
-        SUM(i.Quantity) AS TotalItem,
-        SUM(i.Quantity * i.Price) AS TotalFee
+        rc.Residential_Block,
+        SUM(i.Quantity)            AS TotalItem,
+        SUM(i.Quantity * i.Price)  AS TotalFee
     FROM booking b
-    LEFT JOIN student s ON b.Student_ID = s.Student_ID
-    LEFT JOIN residential_college r ON s.Residential_ID = r.Residential_ID
-    LEFT JOIN item i ON b.Booking_ID = i.Booking_ID
+    LEFT JOIN student s            ON b.Student_ID     = s.Student_ID
+    LEFT JOIN residential_college rc ON s.Residential_ID = rc.Residential_ID
+    LEFT JOIN item i               ON b.Booking_ID     = i.Booking_ID
+    WHERE b.Student_ID = '$studentIdEsc'
     GROUP BY
-        b.Booking_ID,
-        b.DropOff_Date,
-        b.Pickup_Date,
-        b.Booking_Status,
-        s.Student_Name,
-        r.Residential_Block
-    ORDER BY b.Pickup_Date $order
+        b.Booking_ID, b.DropOff_Date, b.Pickup_Date,
+        b.Booking_Status, b.Booking_Priority,
+        s.Student_Name, rc.Residential_Block
+    ORDER BY b.Booking_ID $order
 ";
 
 $result = $conn->query($sql);
@@ -45,320 +92,301 @@ $result = $conn->query($sql);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VaulteM</title>
-    <link rel="stylesheet" href="status.css" type="text/css">
-    <link rel="stylesheet" href="mobile.css" type="text/css">
+    <title>VaulteM – Status</title>
+    <link rel="stylesheet" href="status.css">
+    <link rel="stylesheet" href="mobile.css">
     <style>
-        /* Additional styles for Pay button */
-        .pay-btn {
-            background-color: #4CAF50;
-            color: white;
+        .status-card {
+            position: relative;
+        }
+
+        /* Minimalist 'X' Cancel Button */
+        .small-cancel-btn {
+            position: absolute;
+            top: 12px;
+            right: 15px;
+            background: none;
             border: none;
-            border-radius: 15px;
-            padding: 8px 20px;
+            color: #dc3545;
+            font-size: 1.4rem;
             font-weight: bold;
+            line-height: 1;
             cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 0.9rem;
-            margin-left: 10px;
+            padding: 0;
+            transition: transform 0.2s ease, color 0.2s ease;
+            z-index: 5;
+        }
+        .small-cancel-btn:hover {
+            color: #bd2130;
+            transform: scale(1.2);
+        }
+
+        .pay-btn {
+            background-color: #4CAF50; color: white; border: none; border-radius: 15px;
+            padding: 8px 20px; font-weight: bold; cursor: pointer;
+            transition: all 0.3s ease; font-size: 0.9rem; margin-left: 10px;
+        }
+        .pay-btn:hover { background-color: #45a049; transform: scale(1.05); }
+        .pay-btn:active { transform: scale(0.95); }
+        .pay-btn.paid { background-color: #808080; cursor: not-allowed; opacity: 0.6; }
+        .pay-btn.paid:hover { transform: none; }
+        
+        .status-text { display: inline-block; padding: 4px 12px; border-radius: 12px; font-weight: bold; font-size: 0.85rem; }
+        .status-pending  { background-color: #fff3cd; color: #856404; }
+        .status-approved { background-color: #d4edda; color: #155724; }
+        .status-rejected { background-color: #f8d7da; color: #721c24; }
+        .header-main    { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding-right: 25px; } 
+        .header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .priority-badge {
+            background-color: #dc3545; color: white; font-size: 0.75rem;
+            padding: 2px 8px; border-radius: 10px; font-weight: bold;
         }
         
-        .pay-btn:hover {
-            background-color: #45a049;
-            transform: scale(1.05);
-        }
-        
-        .pay-btn:active {
-            transform: scale(0.95);
-        }
-        
-        .pay-btn.paid {
-            background-color: #808080;
-            cursor: not-allowed;
-            opacity: 0.6;
-        }
-        
-        .pay-btn.paid:hover {
-            transform: none;
-        }
-        
-        .status-text {
+        #profileContainer {
+            position: relative;
             display: inline-block;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-weight: bold;
+            cursor: pointer;
+        }
+        #userImage {
+            vertical-align: middle;
+            margin-left: 5px;
+        }
+        #profileSelect {
+            display: none;
+            position: absolute;
+            right: 0;
+            top: 25px;
+            background-color: #241253;
+            border: 1px solid #E8E9DE;
+            border-radius: 8px;
+            min-width: 130px;
+            z-index: 10;
+        }
+        #profileSelect.show {
+            display: flex;
+            flex-direction: column;
+        }
+        #profileSelect button {
+            background: none;
+            border: none;
+            color: #E8E9DE;
+            padding: 10px;
+            text-align: left;
+            width: 100%;
+            cursor: pointer;
             font-size: 0.85rem;
         }
-        
-        .status-pending {
-            background-color: #fff3cd;
-            color: #856404;
+        #profileSelect button:hover {
+            background-color: rgba(232, 233, 222, 0.2);
         }
-        
-        .status-approved {
-            background-color: #d4edda;
-            color: #155724;
-        }
-        
-        .status-rejected {
-            background-color: #f8d7da;
-            color: #721c24;
-        }
-        
-        .header-main {
-            display: flex;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        
-        .header-actions {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
-        }
-        
+
         @media (max-width: 768px) {
-            .header-main {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-            
-            .header-actions {
-                width: 100%;
-                justify-content: space-between;
-            }
-            
-            .pay-btn {
-                margin-left: 0;
-            }
+            .header-main    { flex-direction: column; align-items: flex-start; }
+            .header-actions { width: 100%; justify-content: space-between; }
+            .pay-btn        { margin-left: 0; }
         }
     </style>
 </head>
 <body>
+<div id="wrapper">
 
-    <div id="wrapper">
-        
-        <div class="leftcontainer">
-            <header>
-                <h1 onclick="window.location.href='mainStatus.php'" style="cursor: pointer;">VaulteM</h1>
-            </header>
+    <div class="leftcontainer">
+        <header>
+            <h1 onclick="window.location.href='mainStatus.php'" style="cursor:pointer;">VaulteM</h1>
+        </header>
+        <button type="button" id="booking" onclick="window.location.href='form.php'">Book space</button>
+    </div>
 
-            <button type="button" id="booking" onclick="window.location.href='form.php'">
-                Book space
+    <div class="rightcontainer">
+        <div id="userName">
+            Welcome,
+            <span id="currentName"><?php echo isset($_SESSION['User_Name']) ? htmlspecialchars($_SESSION['User_Name']) : 'Guest'; ?></span>
+
+            <span id="profileContainer">
+                <img id="userImage" src="/image/user.png" width="20px" height="20px" onclick="profileMenu()">
+                <div id="profileSelect">
+                    <button onclick="showProfile();">Profile</button>
+                    <button onclick="window.location.href='settings.html'">Settings</button>
+                    <button onclick="window.location.href='settings.html'">Notification</button>
+                    <button onclick="showLog();">Logout</button>
+                </div>
+            </span>
+        </div>
+
+        <h1>Status</h1>
+
+        <div class="filter-wrapper">
+            <button id="filterBtn" data-order="<?php echo ($order === 'ASC') ? 'old' : 'recent'; ?>">
+                <span id="filterLabel"><?php echo ($order === 'ASC') ? 'Old to Recent' : 'Recent to Old'; ?></span>
+                <span class="arrow">&#9662;</span>
             </button>
         </div>
 
-        <div class="rightcontainer">
-            <div id="userName">
-                Welcome,
-                <span id="currentName">
-                    <?php echo isset($_SESSION['Student_Name']) ? htmlspecialchars($_SESSION['Student_Name']) : "Guest"; ?>
-                </span>
+        <?php if ($result && $result->num_rows > 0):
+            while ($row = $result->fetch_assoc()):
+                $bookingID     = $row['Booking_ID'];
+                $bookingStatus = $row['Booking_Status'];
+                $isPriority    = ($row['Booking_Priority'] === 'Y');
 
-                <span id="profileContainer">
-                    <div id="profileSelect">
-                        <button onclick="showProfile();">Profile</button>
-                        <button onclick="window.location.href='settings.html'">Settings</button>
-                        <button onclick="window.location.href='settings.html'">Notification</button>
-                        <button onclick="showLog();">Logout</button>
+                // Items
+                $itemStmt = $conn->prepare("SELECT Item_Name, Quantity FROM item WHERE Booking_ID = ?");
+                $itemStmt->bind_param("i", $bookingID);
+                $itemStmt->execute();
+                $itemResult = $itemStmt->get_result();
+
+                // Payment
+                $payStmt = $conn->prepare("SELECT Payment_Status, Amount FROM payment WHERE Booking_ID = ?");
+                $payStmt->bind_param("i", $bookingID);
+                $payStmt->execute();
+                $payResult    = $payStmt->get_result();
+                $paymentRow   = $payResult->fetch_assoc();
+                
+                $paymentStatus = $paymentRow['Payment_Status'] ?? 'N';
+                $totalAmount   = $paymentRow['Amount'] ?? $row['TotalFee'] ?? 0;
+                $payStmt->close();
+        ?>
+        <div class="status-card">
+            <?php if (strtolower($bookingStatus) === 'pending' && strtolower($paymentStatus) !== 'y'): ?>
+                <button class="small-cancel-btn" title="Cancel Booking" onclick="confirmCancellation(<?php echo $bookingID; ?>)">&times;</button>
+            <?php endif; ?>
+
+            <div class="card-header">
+                <div class="header-main">
+                    <span class="order-id">ID: <?php echo htmlspecialchars($bookingID); ?></span>
+                    <?php if ($isPriority): ?>
+                        <span class="priority-badge">EMERGENCY</span>
+                    <?php endif; ?>
+                    <div class="header-actions">
+                        <span class="status-text <?php
+                            echo strtolower($bookingStatus) === 'pending'  ? 'status-pending'  :
+                                (strtolower($bookingStatus) === 'approved' ? 'status-approved' : 'status-rejected');
+                        ?>">
+                            <?php echo htmlspecialchars($bookingStatus); ?>
+                        </span>
+
+                        <?php if (strtolower($bookingStatus) === 'pending' && strtolower($paymentStatus) !== 'y'): ?>
+                            <button class="pay-btn"
+                                    onclick="redirectToPayment('<?php echo $bookingID; ?>', <?php echo (float)$totalAmount; ?>)">
+                                Pay Now
+                            </button>
+                        <?php elseif (strtolower($paymentStatus) === 'y'): ?>
+                            <button class="pay-btn paid" disabled>Paid</button>
+                        <?php endif; ?>
                     </div>
-                </span>
+                </div>
             </div>
 
-            <h1>Status</h1>
+            <div class="summary-info">
+                <p>Drop-off date : <?php echo htmlspecialchars($row['DropOff_Date']); ?></p>
+                <p>Pick-up date  : <?php echo htmlspecialchars($row['Pickup_Date']); ?></p>
+                <p>Item quantity : <?php echo htmlspecialchars($row['TotalItem'] ?? '0'); ?></p>
+                <p>College       : <?php echo htmlspecialchars($row['Residential_Block'] ?? 'N/A'); ?></p>
+                <p>Total fee     : RM <?php echo number_format((float)($row['TotalFee'] ?? 0), 2); ?></p>
+                <?php if ($paymentRow): ?>
+                    <p>Payment status: <?php echo ($paymentStatus === 'Y' || $paymentStatus === 'P') ? 'Paid' : 'Unpaid'; ?></p>
+                <?php endif; ?>
+            </div>
 
-            <div class="filter-wrapper">
-                <button id="filterBtn" data-order="recent">
-                    <span id="filterLabel">Recent to Old</span>
-                    <span class="arrow">&#9662;</span>
+            <div class="button-container">
+                <button class="viewDetailsBtn">
+                    <span class="btn-text">View details</span>
+                    <span class="btn-arrow">&#9662;</span>
                 </button>
             </div>
 
-            <?php 
-            if ($result && $result->num_rows > 0) {
-                while($row = $result->fetch_assoc()) { 
-                    $bookingID = $row['Booking_ID'];
-                    $bookingStatus = $row['Booking_Status'];
-                    
-                    // Fetch items dynamic per booking using a safe prepared statement
-                    $itemStmt = $conn->prepare("SELECT Item_Name, Quantity FROM item WHERE Booking_ID = ?");
-                    $itemStmt->bind_param("s", $bookingID);
-                    $itemStmt->execute();
-                    $itemResult = $itemStmt->get_result();
-                    
-                    // Get payment status for this booking
-                    $paymentStmt = $conn->prepare("SELECT Payment_Status, Amount FROM payment WHERE Booking_ID = ?");
-                    $paymentStmt->bind_param("s", $bookingID);
-                    $paymentStmt->execute();
-                    $paymentResult = $paymentStmt->get_result();
-                    $paymentRow = $paymentResult->fetch_assoc();
-                    $paymentStatus = $paymentRow['Payment_Status'] ?? 'Pending';
-                    $totalAmount = $paymentRow['Amount'] ?? $row['TotalFee'] ?? 0;
-                    $paymentStmt->close();
-            ?>
-                <div class="status-card">
-                    <div class="card-header">
-                        <div class="header-main">
-                            <span class="order-id">ID: <?php echo htmlspecialchars($row['Booking_ID']); ?></span>
-                            <div class="header-actions">
-                                <span class="status-text <?php 
-                                    echo strtolower($bookingStatus) === 'pending' ? 'status-pending' : 
-                                        (strtolower($bookingStatus) === 'approved' ? 'status-approved' : 'status-rejected'); 
-                                ?>">
-                                    <?php echo htmlspecialchars($bookingStatus); ?>
-                                </span>
-                                
-                                <?php if (strtolower($bookingStatus) === 'pending' && strtolower($paymentStatus) !== 'paid'): ?>
-                                    <button class="pay-btn" onclick="redirectToPayment('<?php echo $bookingID; ?>', <?php echo $totalAmount; ?>)">
-                                        Pay Now
-                                    </button>
-                                <?php elseif (strtolower($paymentStatus) === 'paid'): ?>
-                                    <button class="pay-btn paid" disabled>
-                                        Paid
-                                    </button>
-                                <?php endif; ?>
-                            </div>
-                        </div>
+            <div class="card-details">
+                <div class="details-content">
+                    <div class="detailsHeader">
+                        <span>Item details</span><span>Quantity</span>
                     </div>
-
-                    <div class="summary-info">
-                        <p>Drop-off date: <?php echo htmlspecialchars($row['DropOff_Date']); ?></p>
-                        <p>Pick-up date: <?php echo htmlspecialchars($row['Pickup_Date']); ?></p>
-                        <p>Item quantity: <?php echo htmlspecialchars($row['TotalItem'] ?? '0'); ?></p>
-                        <p>College: <?php echo htmlspecialchars($row['Residential_Block'] ?? 'N/A'); ?></p>
-                        <p>Total fee: RM <?php echo htmlspecialchars(number_format((float)$row['TotalFee'], 2)); ?></p>
-                        <?php if ($paymentRow): ?>
-                            <p>Payment Status: <?php echo htmlspecialchars($paymentStatus); ?></p>
-                        <?php endif; ?>
+                    <?php while ($item = $itemResult->fetch_assoc()): ?>
+                    <div class="itemRow">
+                        <span><?php echo htmlspecialchars($item['Item_Name']); ?></span>
+                        <span class="lineSpacer"></span>
+                        <span><?php echo htmlspecialchars($item['Quantity']); ?></span>
                     </div>
-
-                    <div class="button-container">
-                        <button class="viewDetailsBtn">
-                            <span class="btn-text">View details</span>
-                            <span class="btn-arrow">&#9662;</span>
-                        </button>
-                    </div>
-
-                    <div class="card-details">
-                        <div class="details-content">
-                            <div class="detailsHeader">
-                                <span>Item details</span>
-                                <span>Quantity</span>
-                            </div>
-
-                            <?php 
-                            while($item = $itemResult->fetch_assoc()) { 
-                            ?>
-                                <div class="itemRow">
-                                    <span><?php echo htmlspecialchars($item['Item_Name']); ?></span>
-                                    <span class="lineSpacer"></span>
-                                    <span><?php echo htmlspecialchars($item['Quantity']); ?></span>
-                                </div>
-                            <?php 
-                            } 
-                            $itemStmt->close();
-                            ?>
-                        </div>
-                    </div>
+                    <?php endwhile; $itemStmt->close(); ?>
                 </div>
-            <?php 
-                }
-            } else {
-                echo "<p>No booking logs found.</p>";
-            }
-            ?>
-        </div> 
-    </div> 
-    
-    <div id="logoutPopup" class="hidden">
-        <div id="logoutText">
-            <p>Are you sure you want to logout?</p>
-            <div id="logoutButton">
-                <button id="yesBTN" onclick="logout();">Yes</button>
-                <button id="noBTN" onclick="showLog();">No</button>
             </div>
         </div>
+        <?php endwhile;
+        else: ?>
+            <p>No bookings found. <a href="form.php">Make your first booking!</a></p>
+        <?php endif; ?>
+
     </div>
+</div>
 
-    <div id="profilePopup" class="hidden">
-        <div id="profileShortDetails">
-            <h3>Profile</h3>
-            <p>Name: <span id="profileName"></span></p>
-            <p>Gender: <span id="profileGender"></span></p>
-            <p>Email: <span id="profileEmail"></span></p>
+<form id="cancelForm" method="POST" action="">
+    <input type="hidden" id="cancel_booking_id" name="cancel_booking_id" value="">
+</form>
 
-            <div id="profileBTN">
-                <button id="close" onclick="showProfile()">Close Profile</button>
-                <button onclick="window.location.href='profile.html'">More Details</button>
-            </div>
+<div id="logoutPopup" class="hidden">
+    <div id="logoutText">
+        <p>Are you sure you want to logout?</p>
+        <div id="logoutButton">
+            <button id="yesBTN" onclick="window.location.href='studentMAIN.html'">Yes</button>
+            <button id="noBTN"  onclick="showLog()">No</button>
         </div>
     </div>
+</div>
 
-    <script>
-        // Redirect to payment page with booking details
-        function redirectToPayment(bookingId, amount) {
-            // You can pass data via URL parameters or use session
-            window.location.href = 'payment.php?booking_id=' + bookingId + '&amount=' + amount;
+<div id="profilePopup" class="hidden">
+    <div id="profileShortDetails">
+        <h3>Profile</h3>
+        <p>Name  : <span><?php echo isset($_SESSION['User_Name']) ? htmlspecialchars($_SESSION['User_Name']) : ''; ?></span></p>
+        <p>Email : <span><?php echo isset($_SESSION['Email'])     ? htmlspecialchars($_SESSION['Email'])     : ''; ?></span></p>
+        <div id="profileBTN">
+            <button id="close" onclick="showProfile()">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    function confirmCancellation(bookingId) {
+        if (confirm("Are you sure you want to permanently cancel and remove booking ID #" + bookingId + "? This cannot be undone.")) {
+            document.getElementById('cancel_booking_id').value = bookingId;
+            document.getElementById('cancelForm').submit();
         }
+    }
 
-        const filterBtn = document.getElementById("filterBtn");
-        const filterLabel = document.getElementById("filterLabel");
-        const params = new URLSearchParams(window.location.search);
+    function profileMenu() {
+        document.getElementById('profileSelect').classList.toggle('show');
+    }
 
-        if (params.get("sort") === "old") {
-            filterLabel.textContent = "Old to Recent";
-            filterBtn.setAttribute("data-order", "old");
-            filterBtn.classList.add("rotated");
-        } else {
-            filterLabel.textContent = "Recent to Old";
-            filterBtn.setAttribute("data-order", "recent");
-        }
+    function showProfile() { 
+        document.getElementById('profilePopup').classList.toggle('hidden'); 
+    }
 
-        filterBtn.addEventListener("click", function () {
-            let currentOrder = filterBtn.getAttribute("data-order");
-            if (currentOrder === "recent") {
-                window.location.href = "mainStatus.php?sort=old";
-            } else {
-                window.location.href = "mainStatus.php?sort=recent";
+    function showLog() { 
+        document.getElementById('logoutPopup').classList.toggle('hidden'); 
+    }
+
+    function redirectToPayment(bookingId, amount) {
+        window.location.href = 'payment.php?booking_id=' + bookingId + '&amount=' + amount;
+    }
+
+    const filterBtn   = document.getElementById('filterBtn');
+    const filterLabel = document.getElementById('filterLabel');
+
+    filterBtn.addEventListener('click', function() {
+        let current = filterBtn.getAttribute('data-order');
+        window.location.href = 'mainStatus.php?sort=' + (current === 'recent' ? 'old' : 'recent');
+    });
+
+    document.querySelectorAll('.viewDetailsBtn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            let card  = btn.closest('.status-card');
+            let panel = card.querySelector('.card-details');
+            let text  = btn.querySelector('.btn-text');
+            if (panel) {
+                panel.classList.toggle('open');
+                btn.classList.toggle('active');
+                text.textContent = panel.classList.contains('open') ? 'Hide details' : 'View details';
             }
         });
-
-        document.querySelectorAll(".viewDetailsBtn").forEach(function(button) {
-            button.addEventListener("click", function() {
-                const card = button.closest(".status-card");
-                const panel = card.querySelector(".card-details");
-                const text = button.querySelector(".btn-text");
-
-                if (panel) {
-                    panel.classList.toggle("open");
-                    button.classList.toggle("active");
-                    
-                    if (panel.classList.contains("open")) {
-                        text.textContent = "Hide details";
-                    } else {
-                        text.textContent = "View details";
-                    }
-                }
-            });
-        });
-
-        function profileMenu(){
-            document.getElementById('profileSelect').classList.toggle('show');
-        }
-
-        function showLog(){
-            document.getElementById('logoutPopup').classList.toggle('hidden');
-        }
-
-        function logout(){
-            window.location.href='studentMAIN.html';
-        }
-
-        function showProfile(){
-            document.getElementById('profilePopup').classList.toggle('hidden');
-        }
-    </script>
+    });
+</script>
 </body>
 </html>
+<?php $conn->close(); ?>

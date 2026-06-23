@@ -1,40 +1,63 @@
 <?php
 session_start();
 
+// ── Auth guard ───────────────────────────────────────────────────────────────
 if (!isset($_SESSION['role'])) {
     header("Location: login.php");
     exit();
 }
 
-$role = $_SESSION['role'];
+$role     = $_SESSION['role'];
+// FIX: login.php sets User_Name for both students and staff
+$userName = $_SESSION['User_Name'] ?? 'User';
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <title>Main Page</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VaulteM – Dashboard</title>
+    <link rel="stylesheet" href="mobile.css">
+    <style>
+        * { font-family: 'Courier New', Courier, monospace; box-sizing: border-box; }
+        body { background-color: #E8E9DE; margin: 0; padding: 40px; }
+        h1   { color: #241253; }
+        .btn {
+            display: inline-block; background-color: #241253; color: white;
+            border: none; border-radius: 20px; padding: 12px 30px;
+            font-size: 1rem; cursor: pointer; margin: 8px 4px; text-decoration: none;
+        }
+        .btn:hover { opacity: 0.85; }
+        .logout-form { margin-top: 30px; }
+    </style>
 </head>
 <body>
-    <?php if ($role == 'student'): ?>
-        <!-- Student Interface -->
-        <h1>Welcome, Student!</h1>
-        <p>This is your dashboard.</p>
-        <!-- You can add student-specific content here -->
 
-    <?php elseif ($role == 'staff'): ?>
-        <!-- Staff Interface -->
-        <h1>Welcome, Staff!</h1>
-        <p>This is your dashboard.</p>
-        <!-- You can add staff-specific content here -->
+<?php if ($role === 'student'): ?>
 
-    <?php else: ?>
-        <p>Unknown role. Please login again.</p>
-    <?php endif; ?>
+    <h1>Welcome, <?php echo htmlspecialchars($userName); ?>!</h1>
+    <p>Student dashboard</p>
+    <a class="btn" href="mainStatus.php">View Booking Status</a>
+    <a class="btn" href="form.php">New Booking</a>
 
-    <!-- Common logout button -->
-    <form method="post" action="logout.php">
-        <button type="submit">Logout</button>
+<?php elseif ($role === 'staff'): ?>
+
+    <h1>Welcome, <?php echo htmlspecialchars($userName); ?>!</h1>
+    <p>Staff dashboard</p>
+    <a class="btn" href="staffBookings.php">Manage Bookings</a>
+
+<?php else: ?>
+
+    <p>Unknown role. Please <a href="login.php">log in</a> again.</p>
+
+<?php endif; ?>
+
+<!-- FIX: logout form correctly POSTs to logout.php which destroys the session -->
+<div class="logout-form">
+    <form method="POST" action="logout.php">
+        <button type="submit" class="btn">Logout</button>
     </form>
+</div>
+
 </body>
 </html>

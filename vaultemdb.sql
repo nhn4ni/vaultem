@@ -8,7 +8,7 @@ SET time_zone = "+00:00";
 /*!40101 SET NAMES utf8mb4 */;
 
 -- ============================================
--- CREATE AND SELECT DATABASE (Fixes Error #1046)
+-- CREATE AND SELECT DATABASE
 -- ============================================
 CREATE DATABASE IF NOT EXISTS `utem_accommodation`;
 USE `utem_accommodation`;
@@ -63,7 +63,7 @@ CREATE TABLE `payment` (
 
 CREATE TABLE `residential_college` (
   `Residential_ID` int(100) NOT NULL,
-  `Residential_Block` varchar(100) NOT NULL, -- Matched to your text records
+  `Residential_Block` varchar(100) NOT NULL,
   `Gender_Type` char(1) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -108,7 +108,7 @@ ALTER TABLE `item`
   ADD KEY `FK_Item_StoreSpace` (`Space_ID`);
 
 ALTER TABLE `payment`
-  ADD PRIMARY KEY (`Payment_ID`), -- Added PK for consistency
+  ADD PRIMARY KEY (`Payment_ID`),
   ADD KEY `FK_Payment_Booking` (`Booking_ID`);
 
 ALTER TABLE `residential_college`
@@ -130,7 +130,7 @@ ALTER TABLE `student`
 -- ============================================
 
 ALTER TABLE `booking`
-  MODIFY `Booking_ID` int(100) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=156;
+  MODIFY `Booking_ID` int(100) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=158;
 
 ALTER TABLE `item`
   MODIFY `Item_ID` int(100) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
@@ -141,12 +141,11 @@ ALTER TABLE `payment`
 ALTER TABLE `residential_college`
   MODIFY `Residential_ID` int(100) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8; 
 
-
 ALTER TABLE `staff`
   MODIFY `Staff_ID` int(100) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 ALTER TABLE `storespace`
-  MODIFY `Space_ID` int(100) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `Space_ID` int(100) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 -- ============================================
 -- FOREIGN KEY CONSTRAINTS
@@ -183,8 +182,8 @@ INSERT INTO `residential_college` (`Residential_ID`, `Residential_Block`, `Gende
 (6, 'Lestari A', 'M'),
 (7, 'Lestari B', 'F');
 
--- 2. staff
-INSERT INTO `staff` `Staff_ID`, `Staff_Name`, `Staff_Mail`, `Staff_PhoneNo`, `Position`, `Staff_Password`) VALUES
+-- 2. staff (Fixed missing opening parenthesis syntax error here)
+INSERT INTO `staff` (`Staff_ID`, `Staff_Name`, `Staff_Mail`, `Staff_PhoneNo`, `Position`, `Staff_Password`) VALUES
 (1, 'Ahmad Razak', 'ahmad@utem.edu.my', 123456789, 1, 123456),
 (2, 'Siti Khadijah', 'siti@utem.edu.my', 123456780, 2, 654321);
 
@@ -193,10 +192,15 @@ INSERT INTO `student` (`Student_ID`, `Student_Name`, `Student_Mail`, `Student_Pa
 ('S001', 'Faris Baharuddin', 'd032410009@student.utem.edu.my', 'password123', '0198765432', 'M', 4),
 ('S002', 'Hazim Syahmi Zaid', 'd032410283@student.utem.edu.my', 'password456', '0123456789', 'M', 4);
 
--- 4. storespace
+-- 4. storespace (Fixed: Added records for spaces 3 to 7 so all colleges have a store space)
 INSERT INTO `storespace` (`Space_ID`, `Residential_ID`, `Size`, `Status`) VALUES
 (1, 1, 50, 'Y'),
-(2, 2, 30, 'Y');
+(2, 2, 30, 'Y'),
+(3, 3, 40, 'Y'),
+(4, 4, 60, 'Y'),
+(5, 5, 45, 'Y'),
+(6, 6, 55, 'Y'),
+(7, 7, 50, 'Y');
 
 -- 5. booking
 INSERT INTO `booking` (`Booking_ID`, `Booking_Date`, `DropOff_Date`, `Pickup_Date`, `Booking_Status`, `Booking_Priority`, `Staff_ID`, `Student_ID`) VALUES

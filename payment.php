@@ -38,10 +38,15 @@ if ($conn->connect_error) {
 // Verify booking exists and belongs to the student
 $student_id = $_SESSION['student_id'];
 $verifyStmt = $conn->prepare("
-    SELECT b.Booking_ID, b.Booking_Status, p.Payment_Status, p.Amount 
+    SELECT b.Booking_ID, b.Booking_Status, b.DropOff_Date, b.Pickup_Date, rc.Residential_Block, p.Payment_Status, p.Amount,
+           (SELECT SUM(Quantity) FROM item WHERE Booking_ID = b.Booking_ID) AS Total_Items
     FROM booking b 
     LEFT JOIN payment p ON b.Booking_ID = p.Booking_ID 
+    LEFT JOIN item i ON b.Booking_ID = i.Booking_ID
+    LEFT JOIN storespace ss ON i.Space_ID = ss.Space_ID
+    LEFT JOIN residential_college rc ON ss.Residential_ID = rc.Residential_ID
     WHERE b.Booking_ID = ? AND b.Student_ID = ?
+    GROUP BY b.Booking_ID
 ");
 $verifyStmt->bind_param("ss", $booking_id, $student_id);
 $verifyStmt->execute();
@@ -77,10 +82,10 @@ if ($bookingData['Booking_Status'] !== 'Pending') {
 
 $verifyStmt->close();
 
-// Process payment if form is submitted
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+// Process payment if form is submitted via POST
+$paymentSuccess = false;
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['payment_method'])) {
     
-    // YOUR EXISTING PAYMENT CODE
     $method = $_POST['payment_method'];
     $amount = $_POST['amount'];
     $bookingID = $_POST['booking_id'];
@@ -110,20 +115,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $updateBooking->execute();
         $updateBooking->close();
         
-        ?>
-        <script>
-            alert("Payment Successful");
-            window.location.href = "mainStatus.php";
-        </script>
-        <?php
+        $paymentSuccess = true;
     } else {
         echo "Error: " . $stmt->error;
     }
     
     $stmt->close();
     $checkStmt->close();
-    $conn->close();
-    exit();
 }
 
 $conn->close();
@@ -143,273 +141,283 @@ $conn->close();
 
         body {
             background-color: #E8E9DE;
+            color: #241253;
             margin: 0;
-            padding: 20px;
+        }
+
+        #body2 {
+            margin: 0;
+            height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 100vh;
         }
 
-        .payment-container {
-            background: white;
+        .back {
+            position: absolute;
+            border-style: none;
+            background-color: #E8E9DE;
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #241253;
+            margin: 15px;
+            cursor: pointer;
+        }
+
+        h2 {
+            text-align: center;
+            margin-top: 0;
+        }
+
+        .paymentBox {
+            width: 350px;
+            min-height: 55%;
+            background-color: #241253;
+            color: #E8E9DE;
+            border: 1px solid #ccc;
             border-radius: 20px;
-            padding: 40px;
-            max-width: 500px;
-            width: 100%;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-        }
-
-        h1 {
-            color: #241253;
-            text-align: center;
-            margin-bottom: 30px;
-            border-bottom: 3px solid #241253;
-            padding-bottom: 15px;
-        }
-
-        .booking-summary {
-            background: #f8f9fa;
             padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 25px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
         }
 
-        .booking-summary p {
+        .paymentBox h2 {
+            width: 100%;
+        }
+
+        .bookingSummary h3 {
+            margin-top: 10px;
+            margin-bottom: 15px;
+            border-bottom: 1px dashed rgba(232, 233, 222, 0.3);
+            padding-bottom: 5px;
+        }
+
+        .bookingSummary p {
+            font-size: 0.9rem;
             margin: 8px 0;
-            color: #333;
         }
 
-        .booking-summary .amount {
-            font-size: 2rem;
+        #totalAmount {
             font-weight: bold;
+            font-size: 1.4rem;
+        }
+
+        #payBtn,
+        #pay {
+            background-color: #E8E9DE;
             color: #241253;
-            text-align: center;
-            margin: 15px 0 5px 0;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        label {
-            display: block;
-            font-weight: bold;
-            margin-bottom: 8px;
-            color: #333;
-        }
-
-        select, input[type="text"] {
             width: 100%;
             padding: 12px;
-            border: 2px solid #ddd;
-            border-radius: 10px;
-            font-size: 16px;
-            transition: border-color 0.3s;
-            background: white;
+            border-style: none;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
         }
 
-        select:focus, input[type="text"]:focus {
-            border-color: #241253;
-            outline: none;
+        #payBtn:hover,
+        #pay:hover {
+            background-color: #d6d7ca;
+            cursor: pointer;
+            transform: translateY(-2px);
         }
 
-        .payment-methods {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
+        .totalSection {
+            margin-top: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            width: 100%;
+            padding-top: 20px;
+        }
+
+        .totalSection p {
+            margin: 5px 0;
+        }
+
+        #payBtn {
             margin-top: 10px;
         }
 
-        .payment-method {
-            padding: 15px;
-            border: 2px solid #ddd;
-            border-radius: 10px;
-            text-align: center;
+        #payMethod {
+            max-height: 0;
+            opacity: 0;
+            overflow: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+
+        #payMethod.show {
+            opacity: 1;
+            max-height: 300px;
+            transform: translateY(0);
+            margin-top: 15px;
+            border-top: 1px dashed rgba(232, 233, 222, 0.3);
+            padding-top: 15px;
+        }
+
+        .radio-group {
+            margin-bottom: 8px;
+        }
+
+        .radio-group label {
             cursor: pointer;
-            transition: all 0.3s;
+            font-size: 0.95rem;
+            padding-left: 5px;
+        }
+
+        .radio-group input[type="radio"] {
+            cursor: pointer;
+        }
+
+        #pay {
+            margin-top: 15px;
+        }
+
+        .popupOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            z-index: 100;
+        }
+
+        .popupOverlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .popupBox {
             background: white;
+            color: #241253;
+            padding: 30px;
+            border-radius: 20px;
+            width: 320px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            transform: scale(0.8);
+            transition: all 0.3s ease;
         }
 
-        .payment-method:hover {
-            border-color: #241253;
-            transform: scale(1.02);
+        .popupOverlay.show .popupBox {
+            transform: scale(1);
         }
 
-        .payment-method.selected {
-            border-color: #241253;
-            background: #f0edf6;
-        }
-
-        .payment-method input[type="radio"] {
-            display: none;
-        }
-
-        .payment-method .method-icon {
-            font-size: 2rem;
-            display: block;
-            margin-bottom: 5px;
-        }
-
-        .payment-method .method-name {
-            font-weight: bold;
-            color: #333;
-        }
-
-        .btn-pay {
+        #home {
+            margin-top: 15px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 20px;
             background: #241253;
             color: white;
-            border: none;
-            border-radius: 15px;
-            padding: 15px 30px;
-            font-size: 1.2rem;
+            cursor: pointer;
             font-weight: bold;
-            cursor: pointer;
-            width: 100%;
-            transition: all 0.3s;
-            margin-top: 10px;
         }
-
-        .btn-pay:hover {
-            background: #3a1f7a;
-            transform: scale(1.02);
-        }
-
-        .btn-pay:active {
-            transform: scale(0.98);
-        }
-
-        .btn-pay:disabled {
-            background: #999;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .btn-cancel {
-            background: #dc3545;
-            color: white;
-            border: none;
-            border-radius: 15px;
-            padding: 12px 30px;
-            font-size: 1rem;
-            cursor: pointer;
-            width: 100%;
-            margin-top: 10px;
-            transition: background 0.3s;
-        }
-
-        .btn-cancel:hover {
-            background: #c82333;
-        }
-
-        .secure-badge {
-            text-align: center;
-            margin-top: 20px;
-            color: #666;
-            font-size: 0.9rem;
-        }
-
-        .secure-badge span {
-            font-size: 1.2rem;
-        }
-
-        @media (max-width: 480px) {
-            .payment-container {
-                padding: 20px;
-            }
-            
-            .payment-methods {
-                grid-template-columns: 1fr;
-            }
+        
+        #home:hover {
+            background: #391e82;
         }
     </style>
 </head>
+
 <body>
-    <div class="payment-container">
-        <h1>Payment</h1>
-        
-        <div class="booking-summary">
-            <p><strong>Booking ID:</strong> #<?php echo htmlspecialchars($booking_id); ?></p>
-            <p><strong>Student ID:</strong> <?php echo htmlspecialchars($student_id); ?></p>
-            <div class="amount">
-                RM <?php echo number_format((float)$amount, 2); ?>
+
+    <div id="wrapper">
+        <button class="back" onclick="window.location.href='mainStatus.php'"> &#60; Back</button>
+    </div>
+
+    <div id="body2">
+        <div class="paymentBox">
+            <h2>Payment</h2>
+
+            <div class="bookingSummary">
+                <h3>Booking Summary</h3>
+                <p>
+                    Booking ID: 
+                    <span>#<?php echo htmlspecialchars($booking_id); ?></span>
+                </p>
+                <p>
+                    Total Item:
+                    <span id="totalItem"><?php echo isset($bookingData['Total_Items']) ? (int)$bookingData['Total_Items'] : 0; ?></span>
+                </p>
+                <p>
+                    Drop-off Date:
+                    <span id="dropOff_Date"><?php echo htmlspecialchars($bookingData['DropOff_Date'] ?? 'N/A'); ?></span>
+                </p>
+                <p>
+                    Pick-up Date:
+                    <span id="pickUp_Date"><?php echo htmlspecialchars($bookingData['Pickup_Date'] ?? 'N/A'); ?></span>
+                </p>
+                <p>
+                    Residential College:
+                    <span id="resCollege"><?php echo htmlspecialchars($bookingData['Residential_Block'] ?? 'Unassigned'); ?></span>
+                </p>
             </div>
-            <p style="text-align: center; color: #666; font-size: 0.9rem;">Amount to be paid</p>
+
+            <form style="width: 100%; display: contents;" method="POST" action="<?php echo htmlspecialchars($_SERVER['REQUEST_URI']); ?>" id="paymentForm">
+                <input type="hidden" name="booking_id" value="<?php echo htmlspecialchars($booking_id); ?>">
+                <input type="hidden" name="amount" value="<?php echo htmlspecialchars($amount); ?>">
+
+                <div class="totalSection">
+                    <p>Total:</p>
+                    <p><span id="totalAmount">RM <?php echo number_format((float)$amount, 2); ?></span></p>
+                    <button type="button" id="payBtn" onclick="toggleMenu()">Select Payment Method</button>
+                </div>
+                
+                <div id="payMethod">
+                    <p style="margin-top: 0; margin-bottom: 12px;">Select your payment method:</p>
+
+                    <div class="radio-group">
+                        <input type="radio" id="banking" name="payment_method" value="Online Banking" checked>
+                        <label for="banking">Online Banking</label>
+                    </div>
+
+                    <div class="radio-group">
+                        <input type="radio" id="card" name="payment_method" value="Credit/Debit Card">
+                        <label for="card">Credit/Debit Card</label>
+                    </div>
+
+                    <div class="radio-group">
+                        <input type="radio" id="qr" name="payment_method" value="QR">
+                        <label for="qr">QR</label>
+                    </div>
+
+                    <button type="submit" id="pay">Pay Now</button>
+                </div>
+            </form>
         </div>
 
-        <form method="POST" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?>" onsubmit="return validatePayment()">
-            <input type="hidden" name="booking_id" value="<?php echo htmlspecialchars($booking_id); ?>">
-            <input type="hidden" name="amount" value="<?php echo htmlspecialchars($amount); ?>">
-
-            <div class="form-group">
-                <label>Select Payment Method</label>
-                <div class="payment-methods">
-                    <label class="payment-method selected" onclick="selectMethod(this)">
-                        <input type="radio" name="payment_method" value="Online Banking" checked>
-                        <span class="method-icon">Bank</span>
-                        <span class="method-name">Online Banking</span>
-                    </label>
-                    <label class="payment-method" onclick="selectMethod(this)">
-                        <input type="radio" name="payment_method" value="Credit Card">
-                        <span class="method-icon">Card</span>
-                        <span class="method-name">Credit Card</span>
-                    </label>
-                    <label class="payment-method" onclick="selectMethod(this)">
-                        <input type="radio" name="payment_method" value="E-Wallet">
-                        <span class="method-icon">Wallet</span>
-                        <span class="method-name">E-Wallet</span>
-                    </label>
-                    <label class="payment-method" onclick="selectMethod(this)">
-                        <input type="radio" name="payment_method" value="Cash">
-                        <span class="method-icon">Cash</span>
-                        <span class="method-name">Cash</span>
-                    </label>
-                </div>
+        <div id="payPopup" class="popupOverlay <?php echo $paymentSuccess ? 'show' : ''; ?>">
+            <div class="popupBox">
+                <p>Your payment of <strong>RM <?php echo number_format((float)$amount, 2); ?></strong> was successful!</p>
+                <button type="button" id="home" onclick="window.location.href='mainStatus.php'">
+                    Go back home
+                </button>
             </div>
-
-            <button type="submit" class="btn-pay" id="payBtn">
-                Pay Now
-            </button>
-            
-            <button type="button" class="btn-cancel" onclick="window.location.href='mainStatus.php'">
-                Cancel
-            </button>
-        </form>
-
-        <div class="secure-badge">
-            <span>Secure</span> Payment
         </div>
     </div>
 
     <script>
-        function selectMethod(element) {
-            document.querySelectorAll('.payment-method').forEach(function(method) {
-                method.classList.remove('selected');
-            });
-            element.classList.add('selected');
-            element.querySelector('input[type="radio"]').checked = true;
+        function toggleMenu() {
+            document.getElementById("payMethod").classList.toggle("show");
         }
 
-        function validatePayment() {
-            const selectedMethod = document.querySelector('input[name="payment_method"]:checked');
-            
-            if (!selectedMethod) {
-                alert('Please select a payment method.');
-                return false;
-            }
-            
-            const payBtn = document.getElementById('payBtn');
-            payBtn.textContent = 'Processing...';
-            payBtn.disabled = true;
-            
-            return true;
-        }
-
-        document.addEventListener('DOMContentLoaded', function() {
-            const firstMethod = document.querySelector('.payment-method');
-            if (firstMethod) {
-                firstMethod.classList.add('selected');
-            }
+        // Intercept standard form processing to trigger popup states seamlessly
+        document.getElementById("paymentForm").addEventListener("submit", function() {
+            const payButton = document.getElementById('pay');
+            payButton.textContent = 'Processing...';
+            payButton.disabled = true;
         });
     </script>
 </body>
