@@ -184,7 +184,7 @@ INSERT INTO `residential_college` (`Residential_ID`, `Residential_Block`, `Gende
 (7, 'Lestari B', 'F');
 
 -- 2. staff
-INSERT INTO `staff` (`Staff_ID`, `Staff_Name`, `Staff_Mail`, `Staff_PhoneNo`, `Position`, `Staff_Password`) VALUES
+INSERT INTO `staff` `Staff_ID`, `Staff_Name`, `Staff_Mail`, `Staff_PhoneNo`, `Position`, `Staff_Password`) VALUES
 (1, 'Ahmad Razak', 'ahmad@utem.edu.my', 123456789, 1, 123456),
 (2, 'Siti Khadijah', 'siti@utem.edu.my', 123456780, 2, 654321);
 

@@ -4,7 +4,7 @@ $conn = new mysqli(
     "localhost",
     "root",
     "",
-    "vaultemdb"
+    "utem_accommodation"
 );
 
 if ($conn->connect_error)
@@ -41,8 +41,8 @@ if ($stmt->execute())
     {
         ?>
         <script>
-            alert("Payment Succesful");
-            window.location.href = "main.Status.html";
+            alert("Payment Successful");
+            window.location.href = "mainStatus.php";
         </script>
         <?php
     }
