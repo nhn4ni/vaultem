@@ -872,7 +872,7 @@ mysqli_close($conn);
 
             const isEmergency = document.getElementById('emergencyCheckbox').checked;
             if (isEmergency) {
-                basePrice += 10.00;
+                basePrice += 2.00;
             }
 
             document.getElementById('totalPrice').textContent = basePrice.toFixed(2);
