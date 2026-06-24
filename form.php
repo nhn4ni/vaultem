@@ -34,7 +34,6 @@ $collegeQuery = "
            rc.Gender_Type,
            150 AS Available_Space
     FROM residential_college rc
-    WHERE rc.Gender_Type = '$studentGender' OR rc.Gender_Type = 'B'
 ";
 $collegeResult = mysqli_query($conn, $collegeQuery);
 
@@ -239,6 +238,14 @@ mysqli_close($conn);
             font-size: 0.9rem;
             width: 80%;
         }
+        /* All the styling stays in CSS file */
+.selectBtn:disabled,
+.selectBtn.full {
+    background-color: #888888 !important;
+    color: #cccccc !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+}   
 
         .selectCollege {
             background-color: #4CAF50;
@@ -674,8 +681,15 @@ mysqli_close($conn);
                 saveSpacesToLocal();
                 document.querySelectorAll('.collegeCard').forEach(function(card) {
                     let name = card.querySelector('h3').textContent.trim();
+                    let btn = card.querySelector('.selectBtn');
                     if (name === collegeName) {
                         card.querySelector('p span').textContent = collegeSpaces[collegeName];
+                        if (collegeSpaces[collegeName] <= 0){
+                            btn.textContent = "Full";
+                            btn.disabled = true;
+                            btn.classList.add('full');
+                            
+                        }
                     }
                 });
             }
@@ -696,6 +710,13 @@ mysqli_close($conn);
                             let cardName = card.querySelector('h3').textContent.trim();
                             if (cardName === name) {
                                 card.querySelector('p span').textContent = savedSpaces[name];
+                                // ADD THIS: gray out on page load if already 0
+                                let btn = card.querySelector('.selectBtn');
+                                if (savedSpaces[name] <= 0) {
+                                    btn.textContent = "Full";
+                                    btn.disabled = true;
+                                    btn.classList.add('full');
+                                }
                             }
                         });
                     }
@@ -704,19 +725,24 @@ mysqli_close($conn);
         }
 
         function selectCollege(button, collegeName, availableSpace, collegeId) {
-            let allButtons = document.querySelectorAll('.selectBtn');
-            for (let i = 0; i < allButtons.length; i++) {
-                allButtons[i].textContent = "Select";
-                allButtons[i].classList.remove('selectCollege');
+            let currentSpace = getCollegeSpace(collegeName);
+            if (currentSpace <= 0) {
+                return; // stop here, do nothing
             }
 
-            button.textContent = "Selected";
-            button.classList.add('selectCollege');
-            selectedCollegeName = collegeName;
+            let allButtons = document.querySelectorAll('.selectBtn');
+            for (let i = 0; i < allButtons.length; i++) {
+                if (!allButtons[i].classList.contains('full')) {
+                    allButtons[i].textContent = "Select";
+                    allButtons[i].classList.remove('selectCollege');
+                }
+            }
 
-            // Save the ID integer directly instead of the text name string
-            document.getElementById('residentialCollege').value = collegeId; 
-        }
+    button.textContent = "Selected";
+    button.classList.add('selectCollege');
+    selectedCollegeName = collegeName;
+    document.getElementById('residentialCollege').value = collegeId; 
+}
 
         const currentYear = new Date().getFullYear();
         document.getElementById('currentYear').innerHTML = currentYear;
@@ -746,20 +772,79 @@ mysqli_close($conn);
         }
 
         function initDates() {
-            fillDays(dropOffDay, dropOffMonth.selectedIndex);
-            fillDays(pickupDay, pickupMonth.selectedIndex);
+            const today = new Date();
+            const todayMonth = today.getMonth();      // 0-11
+            const todayDay = today.getDate();         // 1-31
+            const todayYear = today.getFullYear();
 
-            dropOffMonth.addEventListener('change', function() {
-                fillDays(dropOffDay, dropOffMonth.selectedIndex);
-            });
-            pickupMonth.addEventListener('change', function() {
-                fillDays(pickupDay, pickupMonth.selectedIndex);
-            });
+            // --- Build Drop-off Month options (current month onwards only) ---
+            dropOffMonth.innerHTML = '';
+            const allMonths = ['January','February','March','April','May','June',
+                            'July','August','September','October','November','December'];
+
+            for (let m = todayMonth; m < 12; m++) {
+                let opt = document.createElement('option');
+                opt.value = m;
+                opt.textContent = allMonths[m];
+                dropOffMonth.appendChild(opt);
+            }
+    dropOffMonth.selectedIndex = 0; // default = current month
+
+    // --- Build Pickup Month options (current month onwards only) ---
+    pickupMonth.innerHTML = '';
+    for (let m = todayMonth; m < 12; m++) {
+        let opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = allMonths[m];
+        pickupMonth.appendChild(opt);
+    }
+    pickupMonth.selectedIndex = 0;
+
+    // --- Fill days based on selected month, respecting today's date ---
+    function fillDaysFiltered(selectElement, monthIndex, restrictToToday, isPickup) {
+    let totalDays = getDaysInMonth(monthIndex);
+    let startDay = 1;
+
+    if (restrictToToday && monthIndex === todayMonth) {
+        startDay = todayDay;
+        // If pickup on same month, must be at least tomorrow
+        if (isPickup) {
+            startDay = todayDay + 1;
         }
+    }
+
+    selectElement.innerHTML = '';
+    for (let i = startDay; i <= totalDays; i++) {
+        let opt = document.createElement('option');
+        opt.value = i < 10 ? '0' + i : '' + i;
+        opt.textContent = i;
+        selectElement.appendChild(opt);
+    }
+}
+
+    // Fill days on load
+    fillDaysFiltered(dropOffDay, todayMonth, true);
+    fillDaysFiltered(pickupDay, todayMonth, true, true);
+
+    // --- When drop-off month changes ---
+    dropOffMonth.addEventListener('change', function() {
+        let selectedMonth = parseInt(dropOffMonth.value);
+        // Only restrict days if user picked current month
+        fillDaysFiltered(dropOffDay, selectedMonth, selectedMonth === todayMonth);
+    });
+
+    // --- When pickup month changes ---
+    pickupMonth.addEventListener('change', function() {
+        let selectedMonth = parseInt(pickupMonth.value);
+        fillDaysFiltered(pickupDay, selectedMonth, selectedMonth === todayMonth);
+    });
+}
 
         function initDropdowns() {
+            event.preventDefault();
             document.querySelectorAll('.chooseBtn').forEach(button => {
                 button.addEventListener('click', function() {
+                    
                     const targetId = this.getAttribute('data-target');
                     const targetDropdown = document.getElementById(targetId);
                     
@@ -796,13 +881,15 @@ mysqli_close($conn);
 
             const isEmergency = document.getElementById('emergencyCheckbox').checked;
             if (isEmergency) {
-                basePrice += 10.00;
+                basePrice += 2.00;
             }
 
             document.getElementById('totalPrice').textContent = basePrice.toFixed(2);
         }
 
         function submitBooking() {
+          
+
             if (!selectedCollegeName) {
                 alert("Please select a Residential College first.");
                 return false;

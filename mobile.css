@@ -30,5 +30,11 @@
         margin: 2%;
     }
 
-
+    .selectBtn:disabled,
+    .selectBtn.full{
+        background-color: #888888 !important;
+        color: #cccccc !important;
+        cursor: not-allowed !important;
+        transform: none !important;
+    }
 }
