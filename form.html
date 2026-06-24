@@ -615,6 +615,34 @@
             document.getElementById('lekirSize').innerHTML = lekirSpace;
             document.getElementById('lekiuSize').innerHTML = lekiuSpace;
             document.getElementById('lestariSize').innerHTML = lestariSpace;
+
+            let spaceMap = {
+                'Satria Jebat': jebatSpace,
+                'Satria Tuah': tuahSpace,
+                'Satria Kasturi': kasturiSpace,
+                'Satria Lekir': lekirSpace,
+                'Satria Lekiu': lekiuSpace,
+                'Lestari A1/A2': lestariSpace
+            };
+
+            document.querySelectorAll('.collegeCard').forEach(function(card){
+                let name= card.querySelector('h3').textContent.trim();
+                let btn=card.querySelector('.selectBtn');
+                if (spaceMap[name] <=0){
+                    btn.textContent = "Full";
+                    btn.disabled = true;
+                    btn.style.backgroundColor = "#888888";
+                    btn.style.color = "cccccc";
+                    btn.style.cursor = "not-allowed";
+                } else{
+                    if (!btn.classList.contains('selectCollege')){
+                        btn.disabled = false;
+                        btn.style.backgroundColor = "";
+                        btn.style.color = "";
+                        btn.style.cursor = "";
+                    }
+                }
+            });
         }
         function getCollegeSpace(collegeName) {
             if(collegeName === 'Satria Jebat') return jebatSpace;
@@ -656,6 +684,11 @@
     
         function selectCollege(button, collegeName) {
 
+            let space = getCollegeSpace(collegeName);
+            if (space <=0){
+                alert("No storage space available at " + colleName + ".");
+                return;
+            }
             let allButtons = document.querySelectorAll('.selectBtn');
             for(let i = 0; i < allButtons.length; i++) {
                 allButtons[i].textContent = "Select";

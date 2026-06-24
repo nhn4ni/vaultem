@@ -34,7 +34,6 @@ $collegeQuery = "
            rc.Gender_Type,
            150 AS Available_Space
     FROM residential_college rc
-    WHERE rc.Gender_Type = '$studentGender' OR rc.Gender_Type = 'B'
 ";
 $collegeResult = mysqli_query($conn, $collegeQuery);
 
@@ -239,6 +238,14 @@ mysqli_close($conn);
             font-size: 0.9rem;
             width: 80%;
         }
+        /* All the styling stays in CSS file */
+.selectBtn:disabled,
+.selectBtn.full {
+    background-color: #888888 !important;
+    color: #cccccc !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+}   
 
         .selectCollege {
             background-color: #4CAF50;
@@ -674,8 +681,15 @@ mysqli_close($conn);
                 saveSpacesToLocal();
                 document.querySelectorAll('.collegeCard').forEach(function(card) {
                     let name = card.querySelector('h3').textContent.trim();
+                    let btn = card.querySelector('.selectBtn');
                     if (name === collegeName) {
                         card.querySelector('p span').textContent = collegeSpaces[collegeName];
+                        if (collegeSpaces[collegeName] <= 0){
+                            btn.textContent = "Full";
+                            btn.disabled = true;
+                            btn.classList.add('full');
+                            
+                        }
                     }
                 });
             }
@@ -696,6 +710,13 @@ mysqli_close($conn);
                             let cardName = card.querySelector('h3').textContent.trim();
                             if (cardName === name) {
                                 card.querySelector('p span').textContent = savedSpaces[name];
+                                // ADD THIS: gray out on page load if already 0
+                                let btn = card.querySelector('.selectBtn');
+                                if (savedSpaces[name] <= 0) {
+                                    btn.textContent = "Full";
+                                    btn.disabled = true;
+                                    btn.classList.add('full');
+                                }
                             }
                         });
                     }
@@ -704,19 +725,24 @@ mysqli_close($conn);
         }
 
         function selectCollege(button, collegeName, availableSpace, collegeId) {
-            let allButtons = document.querySelectorAll('.selectBtn');
-            for (let i = 0; i < allButtons.length; i++) {
-                allButtons[i].textContent = "Select";
-                allButtons[i].classList.remove('selectCollege');
+            let currentSpace = getCollegeSpace(collegeName);
+            if (currentSpace <= 0) {
+                return; // stop here, do nothing
             }
 
-            button.textContent = "Selected";
-            button.classList.add('selectCollege');
-            selectedCollegeName = collegeName;
+            let allButtons = document.querySelectorAll('.selectBtn');
+            for (let i = 0; i < allButtons.length; i++) {
+                if (!allButtons[i].classList.contains('full')) {
+                    allButtons[i].textContent = "Select";
+                    allButtons[i].classList.remove('selectCollege');
+                }
+            }
 
-            // Save the ID integer directly instead of the text name string
-            document.getElementById('residentialCollege').value = collegeId; 
-        }
+    button.textContent = "Selected";
+    button.classList.add('selectCollege');
+    selectedCollegeName = collegeName;
+    document.getElementById('residentialCollege').value = collegeId; 
+}
 
         const currentYear = new Date().getFullYear();
         document.getElementById('currentYear').innerHTML = currentYear;
@@ -758,8 +784,10 @@ mysqli_close($conn);
         }
 
         function initDropdowns() {
+            event.preventDefault();
             document.querySelectorAll('.chooseBtn').forEach(button => {
                 button.addEventListener('click', function() {
+                    
                     const targetId = this.getAttribute('data-target');
                     const targetDropdown = document.getElementById(targetId);
                     
@@ -803,6 +831,8 @@ mysqli_close($conn);
         }
 
         function submitBooking() {
+          
+
             if (!selectedCollegeName) {
                 alert("Please select a Residential College first.");
                 return false;
