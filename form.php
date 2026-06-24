@@ -801,21 +801,30 @@ mysqli_close($conn);
     pickupMonth.selectedIndex = 0;
 
     // --- Fill days based on selected month, respecting today's date ---
-    function fillDaysFiltered(selectElement, monthIndex, restrictToToday) {
-        let totalDays = getDaysInMonth(monthIndex);
-        let startDay = (restrictToToday && monthIndex === todayMonth) ? todayDay : 1;
-        selectElement.innerHTML = '';
-        for (let i = startDay; i <= totalDays; i++) {
-            let opt = document.createElement('option');
-            opt.value = i < 10 ? '0' + i : '' + i;
-            opt.textContent = i;
-            selectElement.appendChild(opt);
+    function fillDaysFiltered(selectElement, monthIndex, restrictToToday, isPickup) {
+    let totalDays = getDaysInMonth(monthIndex);
+    let startDay = 1;
+
+    if (restrictToToday && monthIndex === todayMonth) {
+        startDay = todayDay;
+        // If pickup on same month, must be at least tomorrow
+        if (isPickup) {
+            startDay = todayDay + 1;
         }
     }
 
+    selectElement.innerHTML = '';
+    for (let i = startDay; i <= totalDays; i++) {
+        let opt = document.createElement('option');
+        opt.value = i < 10 ? '0' + i : '' + i;
+        opt.textContent = i;
+        selectElement.appendChild(opt);
+    }
+}
+
     // Fill days on load
     fillDaysFiltered(dropOffDay, todayMonth, true);
-    fillDaysFiltered(pickupDay, todayMonth, true);
+    fillDaysFiltered(pickupDay, todayMonth, true, true);
 
     // --- When drop-off month changes ---
     dropOffMonth.addEventListener('change', function() {
