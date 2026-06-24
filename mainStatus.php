@@ -17,13 +17,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_booking_id']))
     $cancelID = intval($_POST['cancel_booking_id']);
     $student_id = $_SESSION['Student_ID'];
 
-    // 1. Verify booking belongs to this student AND status is pending
+    // Updated verification layout: Allows removal of both entirely unpaid or "Pay Later" records
     $verifySql = "SELECT b.Booking_ID FROM booking b 
                   LEFT JOIN payment p ON b.Booking_ID = p.Booking_ID
                   WHERE b.Booking_ID = ? 
                     AND b.Student_ID = ? 
                     AND LOWER(b.Booking_Status) = 'pending' 
-                    AND (p.Payment_Status IS NULL OR LOWER(p.Payment_Status) != 'y')";
+                    AND (p.Payment_Status IS NULL OR (LOWER(p.Payment_Status) != 'y' AND LOWER(p.Payment_Status) != 'paid'))";
                     
     $verifyStmt = $conn->prepare($verifySql);
     $verifyStmt->bind_param("is", $cancelID, $student_id);
@@ -244,9 +244,12 @@ $result = $conn->query($sql);
                 $paymentStatus = $paymentRow['Payment_Status'] ?? 'N';
                 $totalAmount   = $paymentRow['Amount'] ?? $row['TotalFee'] ?? 0;
                 $payStmt->close();
+
+                // Normalize checks to capture both options ('Y' / 'Paid') vs ('P' / 'Pending' / 'N')
+                $isPaid = (strtolower($paymentStatus) === 'y' || strtolower($paymentStatus) === 'paid');
         ?>
         <div class="status-card">
-            <?php if (strtolower($bookingStatus) === 'pending' && strtolower($paymentStatus) !== 'y'): ?>
+            <?php if (strtolower($bookingStatus) === 'pending' && !$isPaid): ?>
                 <button class="small-cancel-btn" title="Cancel Booking" onclick="confirmCancellation(<?php echo $bookingID; ?>)">&times;</button>
             <?php endif; ?>
 
@@ -264,12 +267,12 @@ $result = $conn->query($sql);
                             <?php echo htmlspecialchars($bookingStatus); ?>
                         </span>
 
-                        <?php if (strtolower($bookingStatus) === 'pending' && strtolower($paymentStatus) !== 'y'): ?>
+                        <?php if (strtolower($bookingStatus) === 'pending' && !$isPaid): ?>
                             <button class="pay-btn"
                                     onclick="redirectToPayment('<?php echo $bookingID; ?>', <?php echo (float)$totalAmount; ?>)">
                                 Pay Now
                             </button>
-                        <?php elseif (strtolower($paymentStatus) === 'y'): ?>
+                        <?php elseif ($isPaid): ?>
                             <button class="pay-btn paid" disabled>Paid</button>
                         <?php endif; ?>
                     </div>
@@ -283,7 +286,7 @@ $result = $conn->query($sql);
                 <p>College       : <?php echo htmlspecialchars($row['Residential_Block'] ?? 'N/A'); ?></p>
                 <p>Total fee     : RM <?php echo number_format((float)($row['TotalFee'] ?? 0), 2); ?></p>
                 <?php if ($paymentRow): ?>
-                    <p>Payment status: <?php echo ($paymentStatus === 'Y' || $paymentStatus === 'P') ? 'Paid' : 'Unpaid'; ?></p>
+                    <p>Payment status: <?php echo $isPaid ? 'Paid' : (($paymentStatus === 'P' || strtolower($paymentStatus) === 'pending') ? 'Pending Payment (Pay Later)' : 'Unpaid'); ?></p>
                 <?php endif; ?>
             </div>
 

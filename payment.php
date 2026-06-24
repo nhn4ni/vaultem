@@ -73,7 +73,7 @@ if ($bookingData['Payment_Status'] === 'Paid' || $bookingData['Payment_Status'] 
 if ($bookingData['Booking_Status'] !== 'Pending') {
     ?>
     <script>
-        alert("This booking cannot be paid for. Status: <?php echo $bookingData['Booking_Status']; ?>");
+        alert("This booking cannot be processed. Status: <?php echo $bookingData['Booking_Status']; ?>");
         window.location.href = "mainStatus.php";
     </script>
     <?php
@@ -82,46 +82,76 @@ if ($bookingData['Booking_Status'] !== 'Pending') {
 
 $verifyStmt->close();
 
-// Process payment if form is submitted via POST
+// Process payment or pay later action if form is submitted via POST
 $paymentSuccess = false;
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['payment_method'])) {
-    
-    $method = $_POST['payment_method'];
-    $amount = $_POST['amount'];
-    $bookingID = $_POST['booking_id'];
-    $status = "P";
-    $date = date("Y-m-d");
+$payLaterSuccess = false;
 
-    // Check if payment already exists
-    $checkStmt = $conn->prepare("SELECT Payment_ID FROM payment WHERE Booking_ID = ?");
-    $checkStmt->bind_param("s", $bookingID);
-    $checkStmt->execute();
-    $checkResult = $checkStmt->get_result();
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $bookingID = $_POST['booking_id'];
+    $amount = $_POST['amount'];
     
-    if ($checkResult->num_rows > 0) {
-        // Update existing payment
-        $stmt = $conn->prepare("UPDATE payment SET Payment_Method = ?, Payment_Status = ?, Payment_Date = ?, Amount = ? WHERE Booking_ID = ?");
-        $stmt->bind_param("sssdi", $method, $status, $date, $amount, $bookingID);
-    } else {
-        // Insert new payment
-        $stmt = $conn->prepare("INSERT INTO payment (Payment_Method, Payment_Status, Payment_Date, Amount, Booking_ID) VALUES (?, ?, ?, ?, ?)");
-        $stmt->bind_param("sssdi", $method, $status, $date, $amount, $bookingID);
-    }
-    
-    if ($stmt->execute()) {
-        // Update booking status to "Approved" after successful payment
-        $updateBooking = $conn->prepare("UPDATE booking SET Booking_Status = 'Approved' WHERE Booking_ID = ?");
-        $updateBooking->bind_param("s", $bookingID);
-        $updateBooking->execute();
-        $updateBooking->close();
+    // --- CASE 1: USER CHOSE TO PAY LATER ---
+    if (isset($_POST['action']) && $_POST['action'] === 'pay_later') {
+        $status = "Pending"; // Payment record keeps standard Pending status
+        $date = null;        // No payment date yet
+
+        $checkStmt = $conn->prepare("SELECT Payment_ID FROM payment WHERE Booking_ID = ?");
+        $checkStmt->bind_param("s", $bookingID);
+        $checkStmt->execute();
+        $checkResult = $checkStmt->get_result();
         
-        $paymentSuccess = true;
-    } else {
-        echo "Error: " . $stmt->error;
+        if ($checkResult->num_rows > 0) {
+            $stmt = $conn->prepare("UPDATE payment SET Payment_Status = ?, Payment_Date = ?, Amount = ? WHERE Booking_ID = ?");
+            $stmt->bind_param("ssds", $status, $date, $amount, $bookingID);
+        } else {
+            $stmt = $conn->prepare("INSERT INTO payment (Payment_Status, Payment_Date, Amount, Booking_ID) VALUES (?, ?, ?, ?)");
+            $stmt->bind_param("ssds", $status, $date, $amount, $bookingID);
+        }
+        
+        if ($stmt->execute()) {
+            // Keep Booking_Status as 'Pending' so they can see it and cancel it later
+            $updateBooking = $conn->prepare("UPDATE booking SET Booking_Status = 'Pending' WHERE Booking_ID = ?");
+            $updateBooking->bind_param("s", $bookingID);
+            $updateBooking->execute();
+            $updateBooking->close();
+            
+            $payLaterSuccess = true;
+        }
+        $stmt->close();
+        $checkStmt->close();
+    } 
+    // --- CASE 2: USER CHOSE TO PAY NOW ---
+    elseif (isset($_POST['payment_method'])) {
+        $method = $_POST['payment_method'];
+        $status = "P";
+        $date = date("Y-m-d");
+
+        $checkStmt = $conn->prepare("SELECT Payment_ID FROM payment WHERE Booking_ID = ?");
+        $checkStmt->bind_param("s", $bookingID);
+        $checkStmt->execute();
+        $checkResult = $checkStmt->get_result();
+        
+        if ($checkResult->num_rows > 0) {
+            $stmt = $conn->prepare("UPDATE payment SET Payment_Method = ?, Payment_Status = ?, Payment_Date = ?, Amount = ? WHERE Booking_ID = ?");
+            $stmt->bind_param("sssds", $method, $status, $date, $amount, $bookingID);
+        } else {
+            $stmt = $conn->prepare("INSERT INTO payment (Payment_Method, Payment_Status, Payment_Date, Amount, Booking_ID) VALUES (?, ?, ?, ?, ?)");
+            $stmt->bind_param("sssds", $method, $status, $date, $amount, $bookingID);
+        }
+        
+        if ($stmt->execute()) {
+            $updateBooking = $conn->prepare("UPDATE booking SET Booking_Status = 'Approved' WHERE Booking_ID = ?");
+            $updateBooking->bind_param("s", $bookingID);
+            $updateBooking->execute();
+            $updateBooking->close();
+            
+            $paymentSuccess = true;
+        } else {
+            echo "Error: " . $stmt->error;
+        }
+        $stmt->close();
+        $checkStmt->close();
     }
-    
-    $stmt->close();
-    $checkStmt->close();
 }
 
 $conn->close();
@@ -205,7 +235,8 @@ $conn->close();
         }
 
         #payBtn,
-        #pay {
+        #pay,
+        #payLaterBtn {
             background-color: #E8E9DE;
             color: #241253;
             width: 100%;
@@ -218,7 +249,8 @@ $conn->close();
         }
 
         #payBtn:hover,
-        #pay:hover {
+        #pay:hover,
+        #payLaterBtn:hover {
             background-color: #d6d7ca;
             cursor: pointer;
             transform: translateY(-2px);
@@ -252,7 +284,7 @@ $conn->close();
 
         #payMethod.show {
             opacity: 1;
-            max-height: 300px;
+            max-height: 350px;
             transform: translateY(0);
             margin-top: 15px;
             border-top: 1px dashed rgba(232, 233, 222, 0.3);
@@ -273,8 +305,22 @@ $conn->close();
             cursor: pointer;
         }
 
-        #pay {
+        /* Flexbox for Button Alignments */
+        .button-group {
+            display: flex;
+            gap: 10px;
             margin-top: 15px;
+            width: 100%;
+        }
+
+        #payLaterBtn {
+            background-color: transparent;
+            color: #E8E9DE;
+            border: 2px solid #E8E9DE;
+        }
+
+        #payLaterBtn:hover {
+            background-color: rgba(232, 233, 222, 0.1);
         }
 
         .popupOverlay {
@@ -368,6 +414,7 @@ $conn->close();
             <form style="width: 100%; display: contents;" method="POST" action="<?php echo htmlspecialchars($_SERVER['REQUEST_URI']); ?>" id="paymentForm">
                 <input type="hidden" name="booking_id" value="<?php echo htmlspecialchars($booking_id); ?>">
                 <input type="hidden" name="amount" value="<?php echo htmlspecialchars($amount); ?>">
+                <input type="hidden" name="action" id="formAction" value="pay_now">
 
                 <div class="totalSection">
                     <p>Total:</p>
@@ -393,14 +440,21 @@ $conn->close();
                         <label for="qr">QR</label>
                     </div>
 
-                    <button type="submit" id="pay">Pay Now</button>
+                    <div class="button-group">
+                        <button type="submit" id="pay" onclick="setAction('pay_now')">Pay Now</button>
+                        <button type="submit" id="payLaterBtn" onclick="setAction('pay_later')">Pay Later</button>
+                    </div>
                 </div>
             </form>
         </div>
 
-        <div id="payPopup" class="popupOverlay <?php echo $paymentSuccess ? 'show' : ''; ?>">
+        <div id="payPopup" class="popupOverlay <?php echo ($paymentSuccess || $payLaterSuccess) ? 'show' : ''; ?>">
             <div class="popupBox">
-                <p>Your payment of <strong>RM <?php echo number_format((float)$amount, 2); ?></strong> was successful!</p>
+                <?php if ($paymentSuccess): ?>
+                    <p>Your payment of <strong>RM <?php echo number_format((float)$amount, 2); ?></strong> was successful!</p>
+                <?php else: ?>
+                    <p>Booking saved successfully! You can process payment or cancel it anytime on your dashboard.</p>
+                <?php endif; ?>
                 <button type="button" id="home" onclick="window.location.href='mainStatus.php'">
                     Go back home
                 </button>
@@ -413,11 +467,23 @@ $conn->close();
             document.getElementById("payMethod").classList.toggle("show");
         }
 
-        // Intercept standard form processing to trigger popup states seamlessly
-        document.getElementById("paymentForm").addEventListener("submit", function() {
-            const payButton = document.getElementById('pay');
-            payButton.textContent = 'Processing...';
-            payButton.disabled = true;
+        // Sets the action input value based on which button is clicked
+        function setAction(actionValue) {
+            document.getElementById("formAction").value = actionValue;
+        }
+
+        document.getElementById("paymentForm").addEventListener("submit", function(e) {
+            const currentAction = document.getElementById("formAction").value;
+            
+            if(currentAction === 'pay_now') {
+                const payButton = document.getElementById('pay');
+                payButton.textContent = 'Processing...';
+                payButton.disabled = true;
+            } else {
+                const payLaterButton = document.getElementById('payLaterBtn');
+                payLaterButton.textContent = 'Saving...';
+                payLaterButton.disabled = true;
+            }
         });
     </script>
 </body>
