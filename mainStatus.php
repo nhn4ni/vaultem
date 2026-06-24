@@ -200,7 +200,7 @@ $result = $conn->query($sql);
     <div class="rightcontainer">
         <div id="userName">
             Welcome,
-            <span id="currentName"><?php echo isset($_SESSION['User_Name']) ? htmlspecialchars($_SESSION['User_Name']) : 'Guest'; ?></span>
+            <span id="currentName"><?php echo isset($_SESSION['Student_Name']) ? htmlspecialchars($_SESSION['Student_Name']) : 'Guest'; ?></span>
 
             <span id="profileContainer">
                 <img id="userImage" src="/image/user.png" width="20px" height="20px" onclick="profileMenu()">
@@ -337,8 +337,8 @@ $result = $conn->query($sql);
 <div id="profilePopup" class="hidden">
     <div id="profileShortDetails">
         <h3>Profile</h3>
-        <p>Name  : <span><?php echo isset($_SESSION['User_Name']) ? htmlspecialchars($_SESSION['User_Name']) : ''; ?></span></p>
-        <p>Email : <span><?php echo isset($_SESSION['Email'])     ? htmlspecialchars($_SESSION['Email'])     : ''; ?></span></p>
+        <p>Name  : <span><?php echo isset($_SESSION['Student_Name']) ? htmlspecialchars($_SESSION['Student_Name']) : ''; ?></span></p>
+        <p>Email : <span><?php echo isset($_SESSION['Student_Mail'])     ? htmlspecialchars($_SESSION['Student_Mail'])     : ''; ?></span></p>
         <div id="profileBTN">
             <button id="close" onclick="showProfile()">Close</button>
         </div>
