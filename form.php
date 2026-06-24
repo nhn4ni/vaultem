@@ -772,16 +772,64 @@ mysqli_close($conn);
         }
 
         function initDates() {
-            fillDays(dropOffDay, dropOffMonth.selectedIndex);
-            fillDays(pickupDay, pickupMonth.selectedIndex);
+            const today = new Date();
+            const todayMonth = today.getMonth();      // 0-11
+            const todayDay = today.getDate();         // 1-31
+            const todayYear = today.getFullYear();
 
-            dropOffMonth.addEventListener('change', function() {
-                fillDays(dropOffDay, dropOffMonth.selectedIndex);
-            });
-            pickupMonth.addEventListener('change', function() {
-                fillDays(pickupDay, pickupMonth.selectedIndex);
-            });
+            // --- Build Drop-off Month options (current month onwards only) ---
+            dropOffMonth.innerHTML = '';
+            const allMonths = ['January','February','March','April','May','June',
+                            'July','August','September','October','November','December'];
+
+            for (let m = todayMonth; m < 12; m++) {
+                let opt = document.createElement('option');
+                opt.value = m;
+                opt.textContent = allMonths[m];
+                dropOffMonth.appendChild(opt);
+            }
+    dropOffMonth.selectedIndex = 0; // default = current month
+
+    // --- Build Pickup Month options (current month onwards only) ---
+    pickupMonth.innerHTML = '';
+    for (let m = todayMonth; m < 12; m++) {
+        let opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = allMonths[m];
+        pickupMonth.appendChild(opt);
+    }
+    pickupMonth.selectedIndex = 0;
+
+    // --- Fill days based on selected month, respecting today's date ---
+    function fillDaysFiltered(selectElement, monthIndex, restrictToToday) {
+        let totalDays = getDaysInMonth(monthIndex);
+        let startDay = (restrictToToday && monthIndex === todayMonth) ? todayDay : 1;
+        selectElement.innerHTML = '';
+        for (let i = startDay; i <= totalDays; i++) {
+            let opt = document.createElement('option');
+            opt.value = i < 10 ? '0' + i : '' + i;
+            opt.textContent = i;
+            selectElement.appendChild(opt);
         }
+    }
+
+    // Fill days on load
+    fillDaysFiltered(dropOffDay, todayMonth, true);
+    fillDaysFiltered(pickupDay, todayMonth, true);
+
+    // --- When drop-off month changes ---
+    dropOffMonth.addEventListener('change', function() {
+        let selectedMonth = parseInt(dropOffMonth.value);
+        // Only restrict days if user picked current month
+        fillDaysFiltered(dropOffDay, selectedMonth, selectedMonth === todayMonth);
+    });
+
+    // --- When pickup month changes ---
+    pickupMonth.addEventListener('change', function() {
+        let selectedMonth = parseInt(pickupMonth.value);
+        fillDaysFiltered(pickupDay, selectedMonth, selectedMonth === todayMonth);
+    });
+}
 
         function initDropdowns() {
             event.preventDefault();
