@@ -90,9 +90,10 @@ $sql = "
         SUM(i.Quantity)            AS TotalItem,
         SUM(i.Quantity * i.Price)  AS TotalFee
     FROM booking b
-    LEFT JOIN student s            ON b.Student_ID     = s.Student_ID
-    LEFT JOIN residential_college rc ON s.Residential_ID = rc.Residential_ID
-    LEFT JOIN item i               ON b.Booking_ID     = i.Booking_ID
+    LEFT JOIN student s              ON b.Student_ID     = s.Student_ID
+    LEFT JOIN item i                 ON b.Booking_ID     = i.Booking_ID
+    LEFT JOIN storespace ss          ON i.Space_ID       = ss.Space_ID
+    LEFT JOIN residential_college rc ON ss.Residential_ID = rc.Residential_ID
     WHERE b.Student_ID = '$studentIdEsc'
     GROUP BY
         b.Booking_ID, b.DropOff_Date, b.Pickup_Date,
