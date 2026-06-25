@@ -379,9 +379,7 @@ $conn->close();
 
 <body>
 
-    <div id="wrapper">
-        <button class="back" onclick="window.location.href='mainStatus.php'"> &#60; Back</button>
-    </div>
+    
 
     <div id="body2">
         <div class="paymentBox">
@@ -390,7 +388,7 @@ $conn->close();
             <div class="bookingSummary">
                 <h3>Booking Summary</h3>
                 <p>
-                    Booking ID: 
+                    Booking ID: A   Q
                     <span>#<?php echo htmlspecialchars($booking_id); ?></span>
                 </p>
                 <p>
