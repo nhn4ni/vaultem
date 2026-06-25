@@ -225,7 +225,7 @@ $result = $conn->query($sql);
                 <div id="profileSelect">
                     <button onclick="showProfile();">Profile</button>
                     <button onclick="window.location.href='settings.html'">Settings</button>
-                    <button onclick="window.location.href='settings.html'">Notification</button>
+                    <button onclick="window.location.href='studentverify.php'">Notification</button>
                     <button onclick="showLog();">Logout</button>
                 </div>
             </span>
@@ -407,6 +407,7 @@ $result = $conn->query($sql);
             }
         });
     });
+
 </script>
 </body>
 </html>

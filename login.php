@@ -1,90 +1,77 @@
 <?php
 session_start();
 
-$servername = "localhost";
-$dbUsername = "root";
-$dbPassword = "";
-$dbname = "utem_accommodation";
-
-$conn = new mysqli($servername, $dbUsername, $dbPassword, $dbname);
-
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
+$conn = new mysqli("localhost", "root", "", "utem_accommodation");
+if ($conn->connect_error) die("Connection failed: " . $conn->connect_error);
 
 $error_message = "";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-    if (
-        !isset($_POST['userEmail']) || !isset($_POST['userPassword']) ||
-        empty(trim($_POST['userEmail'])) || empty($_POST['userPassword'])
-    ) {
+    $email    = trim($_POST['userEmail'] ?? '');
+    $password = $_POST['userPassword'] ?? '';
+
+    if (empty($email) || empty($password)) {
         $error_message = "Please fill in all fields.";
     } else {
-        $email    = trim($_POST['userEmail']);
-        $password = $_POST['userPassword'];
 
-        // ── Check student table ──────────────────────────────────────────────
-        $sql  = "SELECT * FROM student WHERE Student_Mail = ?";
-        $stmt = $conn->prepare($sql);
-        if (!$stmt) {
-            die("SQL Error: " . $conn->error);
-        }
-        $stmt->bind_param("s", $email);
-        $stmt->execute();
-        $result = $stmt->get_result();
+        // ── Route by email domain ────────────────────────────────────────────
+        $isStudent = strpos($email, '@student.utem.edu.my') !== false;
+        $isStaff   = !$isStudent && strpos($email, '@utem.edu.my') !== false;
 
-        if ($result->num_rows === 1) {
-            $user = $result->fetch_assoc();
-            if ($password === $user['Student_Password']) {
-                // FIX: use Student_ID and User_Name consistently across all files
-                $_SESSION['role']      = 'student';
-                $_SESSION['Student_ID'] = $user['Student_ID'];
-                $_SESSION['User_Name'] = $user['Student_Name'];
-                $_SESSION['Email']     = $email;
+        if ($isStudent) {
+            // ── Student login ────────────────────────────────────────────────
+            $stmt = $conn->prepare("SELECT * FROM student WHERE Student_Mail = ?");
+            $stmt->bind_param("s", $email);
+            $stmt->execute();
+            $result = $stmt->get_result();
 
-                header("Location: mainStatus.php");
-                exit();
-            } else {
-                $error_message = "Login failed: wrong password.";
-            }
-        } else {
-            // ── Check staff table ────────────────────────────────────────────
-            $sql_staff  = "SELECT * FROM staff WHERE Staff_Email = ?";
-            $stmt_staff = $conn->prepare($sql_staff);
-            if (!$stmt_staff) {
-                die("SQL Error: " . $conn->error);
-            }
-            $stmt_staff->bind_param("s", $email);
-            $stmt_staff->execute();
-            $result_staff = $stmt_staff->get_result();
-
-            if ($result_staff->num_rows === 1) {
-                $user_staff = $result_staff->fetch_assoc();
-                if ($password === $user_staff['Staff_Password']) {
-                    $_SESSION['role']     = 'staff';
-                    $_SESSION['Staff_ID'] = $user_staff['Staff_ID'];
-                    $_SESSION['User_Name'] = $user_staff['Staff_Name'];
-                    $_SESSION['Email']    = $email;
-
-                    header("Location: main.php");
+            if ($result->num_rows === 1) {
+                $user = $result->fetch_assoc();
+                if (trim($password) === trim($user['Student_Password'])) {
+                    $_SESSION['role']         = 'student';
+                    $_SESSION['Student_ID']   = $user['Student_ID'];
+                    $_SESSION['Student_Name'] = $user['Student_Name'];
+                    $_SESSION['Email']        = $email;
+                    $stmt->close(); $conn->close();
+                    header("Location: mainStatus.php");
                     exit();
                 } else {
-                    $error_message = "Login failed: wrong password.";
+                    $error_message = "Wrong password. Please try again.";
                 }
             } else {
-                if (strpos($email, '@student') !== false) {
-                    $error_message = "Student email not found in the system.";
-                } elseif (strpos($email, '@staff') !== false) {
-                    $error_message = "Staff email not found in the system.";
-                } else {
-                    $error_message = "Email domain not recognised. Please contact admin.";
-                }
+                $error_message = "Student email not found in the system.";
             }
-            $stmt_staff->close();
+            $stmt->close();
+
+        } elseif ($isStaff) {
+            // ── Staff login ──────────────────────────────────────────────────
+            $stmt = $conn->prepare("SELECT * FROM staff WHERE Staff_Mail = ?");
+            $stmt->bind_param("s", $email);
+            $stmt->execute();
+            $result = $stmt->get_result();
+
+            if ($result->num_rows === 1) {
+                $user = $result->fetch_assoc();
+                if (trim($password) === trim($user['Staff_Password'])) {
+                    $_SESSION['role']       = 'staff';
+                    $_SESSION['Staff_ID']   = $user['Staff_ID'];
+                    $_SESSION['Staff_Name'] = $user['Staff_Name'];
+                    $_SESSION['Email']      = $email;
+                    $stmt->close(); $conn->close();
+                    header("Location: staffMainStatus.php");
+                    exit();
+                } else {
+                    $error_message = "Wrong password. Please try again.";
+                }
+            } else {
+                $error_message = "Staff email not found in the system.";
+            }
+            $stmt->close();
+
+        } else {
+            $error_message = "Unrecognised email domain. Use @student.utem.edu.my or @utem.edu.my.";
         }
-        $stmt->close();
     }
 }
 
