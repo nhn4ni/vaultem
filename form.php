@@ -30,11 +30,12 @@ if ($genderQuery && mysqli_num_rows($genderQuery) > 0) {
 // Updated Query: Set unit space capacity value to 150
 $collegeQuery = "
     SELECT rc.Residential_ID,
-    rc.Residential_Block,
-    rc.Gender_Type,
-    COALESCE(ss.Size, 0) AS Available_Space
+           rc.Residential_Block,
+           rc.Gender_Type,
+           COALESCE(ss.Size, 0) AS Available_Space
     FROM residential_college rc
-       LEFT JOIN storespace ss ON rc.Residential_ID = ss.Residential_ID
+    LEFT JOIN storespace ss ON rc.Residential_ID = ss.Residential_ID
+    WHERE rc.Gender_Type = '$studentGender'
 ";
 $collegeResult = mysqli_query($conn, $collegeQuery);
 
@@ -543,7 +544,7 @@ mysqli_close($conn);
                             <?php
                         }
                     } else {
-                        echo "<p style='color: red;'>No accommodations available for your gender profile.</p>";
+                        echo "<p style='color: red;'>No residential colleges available found for your gender.</p>";
                     }
                     ?>
                 </div>
