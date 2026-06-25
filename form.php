@@ -70,11 +70,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         die("No items were submitted for this booking.");
     }
 
-    $totalPrice = $totalItems * 0.5;
-    if ($bookingPriority === 'Y') {
-        $totalPrice += 10;
-    }
+    $totalPrice =
+    ($bigBagQty * 7.00) +
+    ($medBagQty * 5.00) +
+    ($smallBagQty * 3.00) +
 
+    ($largeLugQty * 10.00) +
+    ($medLugQty * 8.00) +
+    ($smallLugQty * 6.00) +
+
+    ($bigBoxQty * 5.00) +
+    ($medBoxQty * 3.00) +
+    ($smallBoxQty * 2.00) +
+
+    ($bucketQty * 3.00) +
+    ($otherQty * 5.00);
+
+if ($bookingPriority === 'Y') {
+    $totalPrice += 10.00;
+}
     $studentIdEsc = mysqli_real_escape_string($conn, $student_id);
     $residentialCollegeEsc = mysqli_real_escape_string($conn, $residentialCollege);
     $dropOffDateEsc = mysqli_real_escape_string($conn, $dropOffDate);
@@ -104,10 +118,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $booking_id = mysqli_insert_id($conn);
 
     // Deduct booked items from storespace
-$deductSpace = mysqli_prepare($conn, "UPDATE storespace SET Size = Size - ? WHERE Space_ID = ?");
-mysqli_stmt_bind_param($deductSpace, "ii", $totalItems, $space_id);
-mysqli_stmt_execute($deductSpace);
-mysqli_stmt_close($deductSpace);
+    $deductSpace = mysqli_prepare($conn, "UPDATE storespace SET Size = Size - ? WHERE Space_ID = ?");
+    mysqli_stmt_bind_param($deductSpace, "ii", $totalItems, $space_id);
+    mysqli_stmt_execute($deductSpace);
+    mysqli_stmt_close($deductSpace);
 
     if (!mysqli_query($conn, "INSERT INTO payment (Payment_Method, Payment_Status, Payment_Date, Amount, Booking_ID)
                              VALUES ('Online', '$paymentStatus', CURDATE(), $totalPrice, $booking_id)")) {
@@ -141,7 +155,6 @@ mysqli_stmt_close($deductSpace);
 
     echo "<h2>Booking Successful!</h2>";
     echo "<p>Your booking has been confirmed. Redirecting to payment...</p>";
-    // FIXED: Appended booking_id and amount variables safely into URL query variables
     echo "<meta http-equiv='refresh' content='3;URL=payment.php?booking_id=" . $booking_id . "&amount=" . $totalPrice . "'>";
     exit();
 }
@@ -245,14 +258,14 @@ mysqli_close($conn);
             font-size: 0.9rem;
             width: 80%;
         }
-        /* All the styling stays in CSS file */
-.selectBtn:disabled,
-.selectBtn.full {
-    background-color: #888888 !important;
-    color: #cccccc !important;
-    cursor: not-allowed !important;
-    transform: none !important;
-}   
+
+        .selectBtn:disabled,
+        .selectBtn.full {
+            background-color: #888888 !important;
+            color: #cccccc !important;
+            cursor: not-allowed !important;
+            transform: none !important;
+        }
 
         .selectCollege {
             background-color: #4CAF50;
@@ -308,6 +321,7 @@ mysqli_close($conn);
             flex: 1;
             min-width: 400px;
             color: #241253;
+            margin-top: 75px;
         }
 
         .detailsHeader {
@@ -329,8 +343,22 @@ mysqli_close($conn);
         .itemLeft {
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 4px;
             width: 65%;
+        }
+
+        /* ── NEW: price tag shown beside / below each item label ── */
+        .itemPrice {
+            font-size: 1rem;
+            color: #7a6e93;
+            font-weight: normal;
+        }
+
+        /* price inside dark dropdown panels */
+        .bagOption .itemPrice {
+            color: #c9c3d8;
+            font-size: 0.74rem;
+            margin-left: 6px;
         }
 
         .chooseBtn {
@@ -525,13 +553,8 @@ mysqli_close($conn);
                                 <span>Day of month</span>
                             </div>
                             <div class="selectWrapper">
-                                <select id="dropOffMonth" name="dropOffMonth">
-                                    <option>January</option><option>February</option><option>March</option>
-                                    <option>April</option><option selected>June</option><option>July</option>
-                                    <option>August</option><option>September</option><option>October</option>
-                                    <option>November</option><option>December</option>
-                                </select>
-                                <span>month</span>
+                                <select id="dropOffMonth" name="dropOffMonth"></select>
+                                <span>Month</span>
                             </div>
                         </div>
                     </div>
@@ -544,13 +567,8 @@ mysqli_close($conn);
                                 <span>Day of month</span>
                             </div>
                             <div class="selectWrapper">
-                                <select id="pickupMonth" name="pickupMonth">
-                                    <option>January</option><option>February</option><option>March</option>
-                                    <option>April</option><option selected>June</option><option>July</option>
-                                    <option>August</option><option>September</option><option>October</option>
-                                    <option>November</option><option>December</option>
-                                </select>
-                                <span>month</span>
+                                <select id="pickupMonth" name="pickupMonth"></select>
+                                <span>Month</span>
                             </div>
                         </div>
                     </div>
@@ -563,20 +581,22 @@ mysqli_close($conn);
                     <span>Quantity / Options</span>
                 </div>
 
+                <!-- BAG -->
                 <div class="itemRow">
                     <div class="itemLeft">
                         <span>Bag</span>
+                    <span class="itemPrice">Big RM7 | Medium RM5 | Small RM3</span>
                         <div class="bagDropdown" id="bagDropdown">
                             <div class="bagOption">
-                                <span>Big Bag </span>
+                                <span>Big Bag <span class="itemPrice">RM 0.50</span></span>
                                 <input type="number" id="bigBagQty" name="bigBagQty" value="0" min="0" oninput="calculateTotal()">
                             </div>
                             <div class="bagOption">
-                                <span>Medium Bag </span>
+                                <span>Medium Bag <span class="itemPrice">RM 0.50</span></span>
                                 <input type="number" id="medBagQty" name="medBagQty" value="0" min="0" oninput="calculateTotal()">
                             </div>
                             <div class="bagOption">
-                                <span>Small Bag</span>
+                                <span>Small Bag <span class="itemPrice">RM 0.50</span></span>
                                 <input type="number" id="smallBagQty" name="smallBagQty" value="0" min="0" oninput="calculateTotal()">
                             </div>
                         </div>
@@ -584,20 +604,22 @@ mysqli_close($conn);
                     <button type="button" class="chooseBtn" data-target="bagDropdown">Choose &#9660;</button>
                 </div>
 
+                <!-- LUGGAGE -->
                 <div class="itemRow">
                     <div class="itemLeft">
                         <span>Luggage</span>
+                        <span class="itemPrice">Large RM10 | Medium RM8 | Small RM6</span>
                         <div class="bagDropdown" id="luggageDropdown">
                             <div class="bagOption">
-                                <span>Large Luggage </span>
+                                <span>Large Luggage <span class="itemPrice">RM 0.50</span></span>
                                 <input type="number" id="largeLugQty" name="largeLugQty" value="0" min="0" oninput="calculateTotal()">
                             </div>
                             <div class="bagOption">
-                                <span>Medium Luggage </span>
+                                <span>Medium Luggage <span class="itemPrice">RM 0.50</span></span>
                                 <input type="number" id="medLugQty" name="medLugQty" value="0" min="0" oninput="calculateTotal()">
                             </div>
                             <div class="bagOption">
-                                <span>Small Luggage </span>
+                                <span>Small Luggage <span class="itemPrice">RM 0.50</span></span>
                                 <input type="number" id="smallLugQty" name="smallLugQty" value="0" min="0" oninput="calculateTotal()">
                             </div>
                         </div>
@@ -605,20 +627,22 @@ mysqli_close($conn);
                     <button type="button" class="chooseBtn" data-target="luggageDropdown">Choose &#9660;</button>
                 </div>
 
+                <!-- BOX -->
                 <div class="itemRow">
                     <div class="itemLeft">
                         <span>Box</span>
+                        <span class="itemPrice">RM 0.50 / item</span>
                         <div class="bagDropdown" id="boxDropdown">
                             <div class="bagOption">
-                                <span>Big Box </span>
+                                <span>Big Box <span class="itemPrice">RM 0.50</span></span>
                                 <input type="number" id="bigBoxQty" name="bigBoxQty" value="0" min="0" oninput="calculateTotal()">
                             </div>
                             <div class="bagOption">
-                                <span>Medium Box </span>
+                                <span>Medium Box <span class="itemPrice">RM 0.50</span></span>
                                 <input type="number" id="medBoxQty" name="medBoxQty" value="0" min="0" oninput="calculateTotal()">
                             </div>
                             <div class="bagOption">
-                                <span>Small Box </span>
+                                <span>Small Box <span class="itemPrice">RM 0.50</span></span>
                                 <input type="number" id="smallBoxQty" name="smallBoxQty" value="0" min="0" oninput="calculateTotal()">
                             </div>
                         </div>
@@ -626,15 +650,20 @@ mysqli_close($conn);
                     <button type="button" class="chooseBtn" data-target="boxDropdown">Choose &#9660;</button>
                 </div>
 
+                <!-- BUCKET/PAIL -->
                 <div class="itemRow">
                     <div class="itemLeft">
                         <span>Bucket/Pail</span>
+                        <span class="itemPrice">RM 0.50 / item</span>
                     </div>
                     <input id="bucketInput" type="number" name="bucketQty" min="0" value="0" oninput="calculateTotal()">
                 </div>
+
+                <!-- OTHERS -->
                 <div class="itemRow">
                     <div class="itemLeft">
                         <span>Others</span>
+                        <span class="itemPrice">RM 0.50 / item</span>
                     </div>
                     <input id="otherQty" type="number" name="otherQty" min="0" value="0" oninput="calculateTotal()">
                 </div>
@@ -666,54 +695,52 @@ mysqli_close($conn);
     <script>
         localStorage.removeItem('collegeSpaces');
         let collegeSpaces = {};
-let selectedCollegeName = "";
+        let selectedCollegeName = "";
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Always read space values fresh from the DB (via data-space on each card)
-    document.querySelectorAll('.collegeCard').forEach(function(card) {
-        let name  = card.querySelector('h3').textContent.trim();
-        let space = parseInt(card.getAttribute('data-space')) || 0;
-        collegeSpaces[name] = space;
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.collegeCard').forEach(function(card) {
+                let name  = card.querySelector('h3').textContent.trim();
+                let space = parseInt(card.getAttribute('data-space')) || 0;
+                collegeSpaces[name] = space;
 
-        // Gray out full colleges on load
-        if (space <= 0) {
-            let btn = card.querySelector('.selectBtn');
-            btn.textContent = "Full";
-            btn.disabled = true;
-            btn.classList.add('full');
-        }
-    });
-
-    initDates();
-    initDropdowns();
-});
-
-function getCollegeSpace(collegeName) {
-    return collegeSpaces[collegeName] ?? 0;
-}
-
-function reduceCollegeSpace(collegeName, units) {
-    if (collegeSpaces.hasOwnProperty(collegeName)) {
-        collegeSpaces[collegeName] -= units;
-        document.querySelectorAll('.collegeCard').forEach(function(card) {
-            let name = card.querySelector('h3').textContent.trim();
-            let btn  = card.querySelector('.selectBtn');
-            if (name === collegeName) {
-                card.querySelector('p span').textContent = collegeSpaces[collegeName];
-                if (collegeSpaces[collegeName] <= 0) {
+                if (space <= 0) {
+                    let btn = card.querySelector('.selectBtn');
                     btn.textContent = "Full";
                     btn.disabled = true;
                     btn.classList.add('full');
                 }
-            }
+            });
+
+            initDates();
+            initDropdowns();
         });
-    }
-}
+
+        function getCollegeSpace(collegeName) {
+            return collegeSpaces[collegeName] ?? 0;
+        }
+
+        function reduceCollegeSpace(collegeName, units) {
+            if (collegeSpaces.hasOwnProperty(collegeName)) {
+                collegeSpaces[collegeName] -= units;
+                document.querySelectorAll('.collegeCard').forEach(function(card) {
+                    let name = card.querySelector('h3').textContent.trim();
+                    let btn  = card.querySelector('.selectBtn');
+                    if (name === collegeName) {
+                        card.querySelector('p span').textContent = collegeSpaces[collegeName];
+                        if (collegeSpaces[collegeName] <= 0) {
+                            btn.textContent = "Full";
+                            btn.disabled = true;
+                            btn.classList.add('full');
+                        }
+                    }
+                });
+            }
+        }
 
         function selectCollege(button, collegeName, availableSpace, collegeId) {
             let currentSpace = getCollegeSpace(collegeName);
             if (currentSpace <= 0) {
-                return; // stop here, do nothing
+                return;
             }
 
             let allButtons = document.querySelectorAll('.selectBtn');
@@ -724,11 +751,11 @@ function reduceCollegeSpace(collegeName, units) {
                 }
             }
 
-    button.textContent = "Selected";
-    button.classList.add('selectCollege');
-    selectedCollegeName = collegeName;
-    document.getElementById('residentialCollege').value = collegeId; 
-}
+            button.textContent = "Selected";
+            button.classList.add('selectCollege');
+            selectedCollegeName = collegeName;
+            document.getElementById('residentialCollege').value = collegeId;
+        }
 
         const currentYear = new Date().getFullYear();
         document.getElementById('currentYear').innerHTML = currentYear;
@@ -742,31 +769,14 @@ function reduceCollegeSpace(collegeName, units) {
             return new Date(currentYear, monthIndex + 1, 0).getDate();
         }
 
-        function fillDays(selectElement, monthIndex) {
-            let days = getDaysInMonth(monthIndex);
-            let selectedVal = selectElement.value;
-            selectElement.innerHTML = '';
-            for (let i = 1; i <= days; i++) {
-                let opt = document.createElement('option');
-                opt.value = i < 10 ? '0' + i : i;
-                opt.textContent = i;
-                selectElement.appendChild(opt);
-            }
-            if (selectedVal && selectedVal <= days) {
-                selectElement.value = selectedVal;
-            }
-        }
-
         function initDates() {
             const today = new Date();
-            const todayMonth = today.getMonth();      // 0-11
-            const todayDay = today.getDate();         // 1-31
-            const todayYear = today.getFullYear();
+            const todayMonth = today.getMonth();
+            const todayDay = today.getDate();
 
-            // --- Build Drop-off Month options (current month onwards only) ---
             dropOffMonth.innerHTML = '';
             const allMonths = ['January','February','March','April','May','June',
-                            'July','August','September','October','November','December'];
+                               'July','August','September','October','November','December'];
 
             for (let m = todayMonth; m < 12; m++) {
                 let opt = document.createElement('option');
@@ -774,66 +784,57 @@ function reduceCollegeSpace(collegeName, units) {
                 opt.textContent = allMonths[m];
                 dropOffMonth.appendChild(opt);
             }
-    dropOffMonth.selectedIndex = 0; // default = current month
+            dropOffMonth.selectedIndex = 0;
 
-    // --- Build Pickup Month options (current month onwards only) ---
-    pickupMonth.innerHTML = '';
-    for (let m = todayMonth; m < 12; m++) {
-        let opt = document.createElement('option');
-        opt.value = m;
-        opt.textContent = allMonths[m];
-        pickupMonth.appendChild(opt);
-    }
-    pickupMonth.selectedIndex = 0;
+            pickupMonth.innerHTML = '';
+            for (let m = todayMonth; m < 12; m++) {
+                let opt = document.createElement('option');
+                opt.value = m;
+                opt.textContent = allMonths[m];
+                pickupMonth.appendChild(opt);
+            }
+            pickupMonth.selectedIndex = 0;
 
-    // --- Fill days based on selected month, respecting today's date ---
-    function fillDaysFiltered(selectElement, monthIndex, restrictToToday, isPickup) {
-    let totalDays = getDaysInMonth(monthIndex);
-    let startDay = 1;
+            function fillDaysFiltered(selectElement, monthIndex, restrictToToday, isPickup) {
+                let totalDays = getDaysInMonth(monthIndex);
+                let startDay = 1;
 
-    if (restrictToToday && monthIndex === todayMonth) {
-        startDay = todayDay;
-        // If pickup on same month, must be at least tomorrow
-        if (isPickup) {
-            startDay = todayDay + 1;
+                if (restrictToToday && monthIndex === todayMonth) {
+                    startDay = todayDay;
+                    if (isPickup) {
+                        startDay = todayDay + 1;
+                    }
+                }
+
+                selectElement.innerHTML = '';
+                for (let i = startDay; i <= totalDays; i++) {
+                    let opt = document.createElement('option');
+                    opt.value = i < 10 ? '0' + i : '' + i;
+                    opt.textContent = i;
+                    selectElement.appendChild(opt);
+                }
+            }
+
+            fillDaysFiltered(dropOffDay, todayMonth, true);
+            fillDaysFiltered(pickupDay, todayMonth, true, true);
+
+            dropOffMonth.addEventListener('change', function() {
+                let selectedMonth = parseInt(dropOffMonth.value);
+                fillDaysFiltered(dropOffDay, selectedMonth, selectedMonth === todayMonth);
+            });
+
+            pickupMonth.addEventListener('change', function() {
+                let selectedMonth = parseInt(pickupMonth.value);
+                fillDaysFiltered(pickupDay, selectedMonth, selectedMonth === todayMonth);
+            });
         }
-    }
-
-    selectElement.innerHTML = '';
-    for (let i = startDay; i <= totalDays; i++) {
-        let opt = document.createElement('option');
-        opt.value = i < 10 ? '0' + i : '' + i;
-        opt.textContent = i;
-        selectElement.appendChild(opt);
-    }
-}
-
-    // Fill days on load
-    fillDaysFiltered(dropOffDay, todayMonth, true);
-    fillDaysFiltered(pickupDay, todayMonth, true, true);
-
-    // --- When drop-off month changes ---
-    dropOffMonth.addEventListener('change', function() {
-        let selectedMonth = parseInt(dropOffMonth.value);
-        // Only restrict days if user picked current month
-        fillDaysFiltered(dropOffDay, selectedMonth, selectedMonth === todayMonth);
-    });
-
-    // --- When pickup month changes ---
-    pickupMonth.addEventListener('change', function() {
-        let selectedMonth = parseInt(pickupMonth.value);
-        fillDaysFiltered(pickupDay, selectedMonth, selectedMonth === todayMonth);
-    });
-}
 
         function initDropdowns() {
-            event.preventDefault();
             document.querySelectorAll('.chooseBtn').forEach(button => {
                 button.addEventListener('click', function() {
-                    
                     const targetId = this.getAttribute('data-target');
                     const targetDropdown = document.getElementById(targetId);
-                    
+
                     if (targetDropdown.classList.contains('show')) {
                         targetDropdown.classList.remove('show');
                         this.innerHTML = 'Choose &#9660;';
@@ -863,19 +864,31 @@ function reduceCollegeSpace(collegeName, units) {
                 totalItems += val;
             });
 
-            let basePrice = totalItems * 0.50;
+            let basePrice =
+    (parseInt(document.getElementById('bigBagQty').value) || 0) * 7 +
+    (parseInt(document.getElementById('medBagQty').value) || 0) * 5 +
+    (parseInt(document.getElementById('smallBagQty').value) || 0) * 3 +
 
-            const isEmergency = document.getElementById('emergencyCheckbox').checked;
-            if (isEmergency) {
-                basePrice += 2.00;
-            }
+    (parseInt(document.getElementById('largeLugQty').value) || 0) * 10 +
+    (parseInt(document.getElementById('medLugQty').value) || 0) * 8 +
+    (parseInt(document.getElementById('smallLugQty').value) || 0) * 6 +
+
+    (parseInt(document.getElementById('bigBoxQty').value) || 0) * 5 +
+    (parseInt(document.getElementById('medBoxQty').value) || 0) * 3 +
+    (parseInt(document.getElementById('smallBoxQty').value) || 0) * 2 +
+
+    (parseInt(document.getElementById('bucketInput').value) || 0) * 3 +
+    (parseInt(document.getElementById('otherQty').value) || 0) * 5;
+
+const isEmergency = document.getElementById('emergencyCheckbox').checked;
+if (isEmergency) {
+    basePrice += 5;
+}
 
             document.getElementById('totalPrice').textContent = basePrice.toFixed(2);
         }
 
         function submitBooking() {
-          
-
             if (!selectedCollegeName) {
                 alert("Please select a Residential College first.");
                 return false;
@@ -888,7 +901,7 @@ function reduceCollegeSpace(collegeName, units) {
                 'bigBoxQty', 'medBoxQty', 'smallBoxQty',
                 'bucketInput', 'otherQty'
             ];
-            
+
             qtyInputs.forEach(id => {
                 totalItems += parseInt(document.getElementById(id).value) || 0;
             });
@@ -904,11 +917,11 @@ function reduceCollegeSpace(collegeName, units) {
                 return false;
             }
 
-            let dropMonthNum = dropOffMonth.selectedIndex + 1;
+            let dropMonthNum = parseInt(dropOffMonth.value) + 1;
             let formattedDropMonth = dropMonthNum < 10 ? '0' + dropMonthNum : dropMonthNum;
             let fullDropOffDate = `${currentYear}-${formattedDropMonth}-${dropOffDay.value}`;
 
-            let pickMonthNum = pickupMonth.selectedIndex + 1;
+            let pickMonthNum = parseInt(pickupMonth.value) + 1;
             let formattedPickMonth = pickMonthNum < 10 ? '0' + pickMonthNum : pickMonthNum;
             let fullPickupDate = `${currentYear}-${formattedPickMonth}-${pickupDay.value}`;
 
@@ -919,7 +932,7 @@ function reduceCollegeSpace(collegeName, units) {
 
             document.getElementById('dropOffDate').value = fullDropOffDate;
             document.getElementById('pickupDate').value = fullPickupDate;
-            
+
             if (document.getElementById('emergencyCheckbox').checked) {
                 document.getElementById('emergency').name = "emergency";
                 document.getElementById('emergency').value = "Y";
