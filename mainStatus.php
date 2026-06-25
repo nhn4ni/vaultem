@@ -31,6 +31,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_booking_id']))
     $verifyResult = $verifyStmt->get_result();
 
     if ($verifyResult->num_rows > 0) {
+        // Get total items + space being cancelled
+$getItems = $conn->prepare("SELECT SUM(Quantity) AS total, Space_ID FROM item WHERE Booking_ID = ? GROUP BY Space_ID");
+$getItems->bind_param("i", $cancelID);
+$getItems->execute();
+$itemsResult = $getItems->get_result();
+if ($itemsRow = $itemsResult->fetch_assoc()) {
+    $cancelledQty = (int)$itemsRow['total'];
+    $spaceID      = (int)$itemsRow['Space_ID'];
+
+    // Restore units back to storespace
+    $restoreSpace = $conn->prepare("UPDATE storespace SET Size = Size + ? WHERE Space_ID = ?");
+    $restoreSpace->bind_param("ii", $cancelledQty, $spaceID);
+    $restoreSpace->execute();
+    $restoreSpace->close();
+}
+$getItems->close();
         // 2. Delete any records inside 'payment' linked to this booking
         $deletePay = $conn->prepare("DELETE FROM payment WHERE Booking_ID = ?");
         $deletePay->bind_param("i", $cancelID);
@@ -92,7 +108,8 @@ $result = $conn->query($sql);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VaulteM – Status</title>
+    <title>VaulteM</title>
+    <link rel="icon" type="image/x-icon" href="vaultemLogo.ico">
     <link rel="stylesheet" href="status.css">
     <link rel="stylesheet" href="mobile.css">
     <style>

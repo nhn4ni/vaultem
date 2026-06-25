@@ -32,8 +32,9 @@ $collegeQuery = "
     SELECT rc.Residential_ID,
            rc.Residential_Block,
            rc.Gender_Type,
-           150 AS Available_Space
+           COALESCE(ss.Size, 0) AS Available_Space
     FROM residential_college rc
+    LEFT JOIN storespace ss ON rc.Residential_ID = ss.Residential_ID
 ";
 $collegeResult = mysqli_query($conn, $collegeQuery);
 
@@ -101,6 +102,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         die("Booking insert failed: " . mysqli_error($conn));
     }
     $booking_id = mysqli_insert_id($conn);
+
+    // Deduct booked items from storespace
+$deductSpace = mysqli_prepare($conn, "UPDATE storespace SET Size = Size - ? WHERE Space_ID = ?");
+mysqli_stmt_bind_param($deductSpace, "ii", $totalItems, $space_id);
+mysqli_stmt_execute($deductSpace);
+mysqli_stmt_close($deductSpace);
 
     if (!mysqli_query($conn, "INSERT INTO payment (Payment_Method, Payment_Status, Payment_Date, Amount, Booking_ID)
                              VALUES ('Online', '$paymentStatus', CURDATE(), $totalPrice, $booking_id)")) {
@@ -657,72 +664,51 @@ mysqli_close($conn);
     </form>
 
     <script>
-        let collegeSpaces = {}; 
-        let selectedCollegeName = "";
+        localStorage.removeItem('collegeSpaces');
+        let collegeSpaces = {};
+let selectedCollegeName = "";
 
-        document.addEventListener('DOMContentLoaded', function() {
-            document.querySelectorAll('.collegeCard').forEach(function(card) {
-                let name = card.querySelector('h3').textContent.trim();
-                let space = parseInt(card.getAttribute('data-space')) || 150;
-                collegeSpaces[name] = space;
-            });
-            loadSpacesFromLocal();
-            initDates();
-            initDropdowns();
-        });
+document.addEventListener('DOMContentLoaded', function() {
+    // Always read space values fresh from the DB (via data-space on each card)
+    document.querySelectorAll('.collegeCard').forEach(function(card) {
+        let name  = card.querySelector('h3').textContent.trim();
+        let space = parseInt(card.getAttribute('data-space')) || 0;
+        collegeSpaces[name] = space;
 
-        function getCollegeSpace(collegeName) {
-            return collegeSpaces[collegeName] ?? 150;
+        // Gray out full colleges on load
+        if (space <= 0) {
+            let btn = card.querySelector('.selectBtn');
+            btn.textContent = "Full";
+            btn.disabled = true;
+            btn.classList.add('full');
         }
+    });
 
-        function reduceCollegeSpace(collegeName, units) {
-            if (collegeSpaces.hasOwnProperty(collegeName)) {
-                collegeSpaces[collegeName] -= units;
-                saveSpacesToLocal();
-                document.querySelectorAll('.collegeCard').forEach(function(card) {
-                    let name = card.querySelector('h3').textContent.trim();
-                    let btn = card.querySelector('.selectBtn');
-                    if (name === collegeName) {
-                        card.querySelector('p span').textContent = collegeSpaces[collegeName];
-                        if (collegeSpaces[collegeName] <= 0){
-                            btn.textContent = "Full";
-                            btn.disabled = true;
-                            btn.classList.add('full');
-                            
-                        }
-                    }
-                });
-            }
-        }
+    initDates();
+    initDropdowns();
+});
 
-        function saveSpacesToLocal() {
-            localStorage.setItem('collegeSpaces', JSON.stringify(collegeSpaces));
-        }
+function getCollegeSpace(collegeName) {
+    return collegeSpaces[collegeName] ?? 0;
+}
 
-        function loadSpacesFromLocal() {
-            let saved = localStorage.getItem('collegeSpaces');
-            if (saved) {
-                let savedSpaces = JSON.parse(saved);
-                for (let name in savedSpaces) {
-                    if (collegeSpaces.hasOwnProperty(name)) {
-                        collegeSpaces[name] = savedSpaces[name];
-                        document.querySelectorAll('.collegeCard').forEach(function(card) {
-                            let cardName = card.querySelector('h3').textContent.trim();
-                            if (cardName === name) {
-                                card.querySelector('p span').textContent = savedSpaces[name];
-                                // ADD THIS: gray out on page load if already 0
-                                let btn = card.querySelector('.selectBtn');
-                                if (savedSpaces[name] <= 0) {
-                                    btn.textContent = "Full";
-                                    btn.disabled = true;
-                                    btn.classList.add('full');
-                                }
-                            }
-                        });
-                    }
+function reduceCollegeSpace(collegeName, units) {
+    if (collegeSpaces.hasOwnProperty(collegeName)) {
+        collegeSpaces[collegeName] -= units;
+        document.querySelectorAll('.collegeCard').forEach(function(card) {
+            let name = card.querySelector('h3').textContent.trim();
+            let btn  = card.querySelector('.selectBtn');
+            if (name === collegeName) {
+                card.querySelector('p span').textContent = collegeSpaces[collegeName];
+                if (collegeSpaces[collegeName] <= 0) {
+                    btn.textContent = "Full";
+                    btn.disabled = true;
+                    btn.classList.add('full');
                 }
             }
-        }
+        });
+    }
+}
 
         function selectCollege(button, collegeName, availableSpace, collegeId) {
             let currentSpace = getCollegeSpace(collegeName);
