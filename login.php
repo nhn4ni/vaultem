@@ -126,7 +126,7 @@ $conn->close();
         </form>
 
         <p style="margin-top:15px;">
-            Don't have an account? <a href="register.php">Register here</a>
+            Don't have an account? <a href="signin.php">Register here</a>
         </p>
         <p>
             <a href="newpass.php">Forgot password?</a>
