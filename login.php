@@ -96,6 +96,8 @@ $conn->close();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VaulteM – Login</title>
+        <link rel="icon" type="image/x-icon" href="vaultemLogo.ico">
+
     <link rel="stylesheet" href="login.css">
     <link rel="stylesheet" href="mobile.css">
 </head>
