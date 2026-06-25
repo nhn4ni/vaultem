@@ -546,7 +546,7 @@ mysqli_close($conn);
 
                 <div class="dateContainer">
                     <div class="dateSection">
-                        <h2>Drop-off <span id="currentYear"></span></h2>
+                        <h2>Drop-off date <span id="currentYear"></span></h2>
                         <div class="dropOffRow">
                             <div class="selectWrapper">
                                 <select id="dropOffDay" name="dropOffDay"></select>
