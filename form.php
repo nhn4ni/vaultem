@@ -488,7 +488,7 @@ mysqli_close($conn);
             height: 18px;
             cursor: pointer;
 }
- .emergencyNote {
+        .emergencyNote {
         margin-left: 10px;
         font-size: 0.9rem;
         color: #ff0000e0;
@@ -504,6 +504,35 @@ mysqli_close($conn);
             font-size: 1.1rem;
             font-weight: bold;
             cursor: pointer;
+        }
+
+        .submitBtn:hover{
+            background-color: #969696;
+            cursor: pointer;
+            transform: translateY(-2px);
+        }
+
+        #backBtn {
+            background-color: #bb3d3d;
+            color: #E8E9DE;
+            border: none;
+            border-radius: 25px;
+            padding: 12px 45px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        #backBtn:hover{
+            background-color: #a03333;
+            cursor: pointer;
+            transform: translateY(-2px);
+        }
+
+        .selectBtn:hover{
+            background-color: #969696;
+            cursor: pointer;
+            transform: translateY(-2px);
         }
 
         @media (max-width: 1024px) {
@@ -699,6 +728,8 @@ mysqli_close($conn);
 
                     <span class ="emergencyNote">(+ RM5 for Emergency Booking)</span>
                 </div>
+                <button type="button" id="backBtn" onclick="window.location.href='mainStatus.php'">Cancel</button>
+                <!-- button to go back home or to cancel booking -->
                 <button type="submit" class="submitBtn">Submit</button>
             </div>
         </div>
