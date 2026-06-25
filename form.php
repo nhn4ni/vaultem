@@ -71,6 +71,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         die("No items were submitted for this booking.");
     }
 
+    if ($totalItems > 3) {
+        die("Booking limit exceeded. You may only book a maximum of 3 items.");
+    }
+
     $totalPrice =
     ($bigBagQty * 7.00) +
     ($medBagQty * 5.00) +
@@ -544,7 +548,7 @@ mysqli_close($conn);
                             <?php
                         }
                     } else {
-                        echo "<p style='color: red;'>No residential colleges available found for your gender.</p>";
+                        echo "<p style='color: red;'>No residential colleges available found for your gendergit add.</p>";
                     }
                     ?>
                 </div>
@@ -587,6 +591,9 @@ mysqli_close($conn);
                     <span>Item details</span>
                     <span>Quantity / Options</span>
                 </div>
+                <p id="itemLimitReminder" style="color: #e74c3c; font-size: 0.85rem; margin: -20px 0 20px 0;">
+                     Maximum 3 items per booking.
+                </p>
 
                 <!-- BAG -->
                 <div class="itemRow">
@@ -596,15 +603,15 @@ mysqli_close($conn);
                         <div class="bagDropdown" id="bagDropdown">
                             <div class="bagOption">
                                 <span>Big Bag <span class="itemPrice">RM 0.50</span></span>
-                                <input type="number" id="bigBagQty" name="bigBagQty" value="0" min="0" oninput="calculateTotal()">
+                                <input type="number" id="bigBagQty" name="bigBagQty" value="0" min="0" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                             <div class="bagOption">
                                 <span>Medium Bag <span class="itemPrice">RM 0.50</span></span>
-                                <input type="number" id="medBagQty" name="medBagQty" value="0" min="0" oninput="calculateTotal()">
+                                <input type="number" id="medBagQty" name="medBagQty" value="0" min="0" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                             <div class="bagOption">
                                 <span>Small Bag <span class="itemPrice">RM 0.50</span></span>
-                                <input type="number" id="smallBagQty" name="smallBagQty" value="0" min="0" oninput="calculateTotal()">
+                                <input type="number" id="smallBagQty" name="smallBagQty" value="0" min="0" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                         </div>
                     </div>
@@ -619,15 +626,15 @@ mysqli_close($conn);
                         <div class="bagDropdown" id="luggageDropdown">
                             <div class="bagOption">
                                 <span>Large Luggage <span class="itemPrice">RM 0.50</span></span>
-                                <input type="number" id="largeLugQty" name="largeLugQty" value="0" min="0" oninput="calculateTotal()">
+                                <input type="number" id="largeLugQty" name="largeLugQty" value="0" min="0" oninput="calculateTotal(); checkItemLimit();">
                             </div>
                             <div class="bagOption">
                                 <span>Medium Luggage <span class="itemPrice">RM 0.50</span></span>
-                                <input type="number" id="medLugQty" name="medLugQty" value="0" min="0" oninput="calculateTotal()">
+                                <input type="number" id="medLugQty" name="medLugQty" value="0" min="0" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                             <div class="bagOption">
                                 <span>Small Luggage <span class="itemPrice">RM 0.50</span></span>
-                                <input type="number" id="smallLugQty" name="smallLugQty" value="0" min="0" oninput="calculateTotal()">
+                                <input type="number" id="smallLugQty" name="smallLugQty" value="0" min="0" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                         </div>
                     </div>
@@ -642,15 +649,15 @@ mysqli_close($conn);
                         <div class="bagDropdown" id="boxDropdown">
                             <div class="bagOption">
                                 <span>Big Box <span class="itemPrice">RM 0.50</span></span>
-                                <input type="number" id="bigBoxQty" name="bigBoxQty" value="0" min="0" oninput="calculateTotal()">
+                                <input type="number" id="bigBoxQty" name="bigBoxQty" value="0" min="0" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                             <div class="bagOption">
                                 <span>Medium Box <span class="itemPrice">RM 0.50</span></span>
-                                <input type="number" id="medBoxQty" name="medBoxQty" value="0" min="0" oninput="calculateTotal()">
+                                <input type="number" id="medBoxQty" name="medBoxQty" value="0" min="0" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                             <div class="bagOption">
                                 <span>Small Box <span class="itemPrice">RM 0.50</span></span>
-                                <input type="number" id="smallBoxQty" name="smallBoxQty" value="0" min="0" oninput="calculateTotal()">
+                                <input type="number" id="smallBoxQty" name="smallBoxQty" value="0" min="0" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                         </div>
                     </div>
@@ -663,7 +670,7 @@ mysqli_close($conn);
                         <span>Bucket/Pail</span>
                         <span class="itemPrice">RM 0.50 / item</span>
                     </div>
-                    <input id="bucketInput" type="number" name="bucketQty" min="0" value="0" oninput="calculateTotal()">
+                    <input id="bucketInput" type="number" name="bucketQty" min="0" value="0" oninput="calculateTotal(); checkItemLimit()">
                 </div>
 
                 <!-- OTHERS -->
@@ -672,7 +679,7 @@ mysqli_close($conn);
                         <span>Others</span>
                         <span class="itemPrice">RM 0.50 / item</span>
                     </div>
-                    <input id="otherQty" type="number" name="otherQty" min="0" value="0" oninput="calculateTotal()">
+                    <input id="otherQty" type="number" name="otherQty" min="0" value="0" oninput="calculateTotal(); checkItemLimit()">
                 </div>
 
                 <input type="hidden" id="dropOffDate" name="dropOffDate" value="">
@@ -691,7 +698,7 @@ mysqli_close($conn);
 
                 <div class="emergencySection">
                     <label>
-                        <input type="checkbox" id="emergencyCheckbox" onchange="calculateTotal()">
+                        <input type="checkbox" id="emergencyCheckbox" onchange="calculateTotal(); checkItemLimit()">
                         <span>Emergency</span>
                     </label>
 
@@ -745,6 +752,71 @@ mysqli_close($conn);
                     }
                 });
             }
+        }
+
+        function checkItemLimit() {
+            const qtyInputs = [
+                'bigBagQty', 'medBagQty', 'smallBagQty',
+                'largeLugQty', 'medLugQty', 'smallLugQty',
+                'bigBoxQty', 'medBoxQty', 'smallBoxQty',
+                'bucketInput', 'otherQty'
+            ];
+
+            let totalItems = 0;
+            qtyInputs.forEach(id => {
+                totalItems += parseInt(document.getElementById(id).value) || 0;
+            });
+
+            const limitReached = totalItems >= 3;
+            const reminder = document.getElementById('itemLimitReminder');
+
+            reminder.style.color = limitReached ? '#c0392b' : '#e74c3c';
+            reminder.textContent = limitReached
+                ? '* Limit reached! Reduce items to add more.'
+                : '* Maximum 3 items per booking.';
+
+            // Disable/enable Choose buttons
+            document.querySelectorAll('.chooseBtn').forEach(btn => {
+                if (limitReached) {
+                    btn.disabled = true;
+                    btn.style.backgroundColor = '#888888';
+                    btn.style.cursor = 'not-allowed';
+                } else {
+                    btn.disabled = false;
+                    btn.style.backgroundColor = '#241253';
+                    btn.style.cursor = 'pointer';
+                }
+            });
+
+                const dropdownInputs = [
+                    'bigBagQty', 'medBagQty', 'smallBagQty',
+                    'largeLugQty', 'medLugQty', 'smallLugQty',
+                    'bigBoxQty', 'medBoxQty', 'smallBoxQty'
+                ];
+
+                dropdownInputs.forEach(id => {
+                    const input = document.getElementById(id);
+                    const val = parseInt(input.value) || 0;
+
+                if (limitReached && val === 0) {
+                    input.disabled = true;
+                    input.style.backgroundColor = '#aaaaaa';
+                    input.style.color = '#666666';
+                } else {
+                    input.disabled = false;
+                    input.style.backgroundColor = '#E8E9DE';
+                    input.style.color = '#241253';
+                }
+            });
+
+            const bucketInput = document.getElementById('bucketInput');
+            const otherInput = document.getElementById('otherQty');
+
+            bucketInput.disabled = limitReached && (parseInt(bucketInput.value) || 0) === 0;
+            otherInput.disabled  = limitReached && (parseInt(otherInput.value) || 0) === 0;
+
+            bucketInput.style.backgroundColor = bucketInput.disabled ? '#cccccc' : '#ffffff';
+            otherInput.style.backgroundColor  = otherInput.disabled  ? '#cccccc' : '#ffffff';
         }
 
         function selectCollege(button, collegeName, availableSpace, collegeId) {
@@ -920,6 +992,12 @@ if (isEmergency) {
                 alert("Please select at least 1 item to book storage.");
                 return false;
             }
+
+            if (totalItems > 3) {
+                alert("You can only book a maximum of 3 items per booking.");
+                return false;
+            }
+
 
             let spaceAvailable = getCollegeSpace(selectedCollegeName);
             if (totalItems > spaceAvailable) {
