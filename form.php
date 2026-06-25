@@ -30,11 +30,11 @@ if ($genderQuery && mysqli_num_rows($genderQuery) > 0) {
 // Updated Query: Set unit space capacity value to 150
 $collegeQuery = "
     SELECT rc.Residential_ID,
-           rc.Residential_Block,
-           rc.Gender_Type,
-           COALESCE(ss.Size, 0) AS Available_Space
+    rc.Residential_Block,
+    rc.Gender_Type,
+    COALESCE(ss.Size, 0) AS Available_Space
     FROM residential_college rc
-    LEFT JOIN storespace ss ON rc.Residential_ID = ss.Residential_ID
+       LEFT JOIN storespace ss ON rc.Residential_ID = ss.Residential_ID
 ";
 $collegeResult = mysqli_query($conn, $collegeQuery);
 
@@ -353,7 +353,7 @@ mysqli_close($conn);
             color: #7a6e93;
             font-weight: normal;
         }
-
+        
         /* price inside dark dropdown panels */
         .bagOption .itemPrice {
             color: #c9c3d8;
@@ -484,8 +484,14 @@ mysqli_close($conn);
             width: 18px;
             height: 18px;
             cursor: pointer;
+}
+ .emergencyNote {
+        margin-left: 10px;
+        font-size: 0.9rem;
+        color: #ff0000e0;
+        font-weight: bold;
         }
-
+        
         .submitBtn {
             background-color: #E8E9DE;
             color: #241253;
@@ -546,7 +552,7 @@ mysqli_close($conn);
 
                 <div class="dateContainer">
                     <div class="dateSection">
-                        <h2>Drop-off date <span id="currentYear"></span></h2>
+                        <h2>Drop-off <span id="currentYear"></span></h2>
                         <div class="dropOffRow">
                             <div class="selectWrapper">
                                 <select id="dropOffDay" name="dropOffDay"></select>
@@ -681,11 +687,14 @@ mysqli_close($conn);
             </div>
 
             <div class="rightFooterSection">
+
                 <div class="emergencySection">
                     <label>
                         <input type="checkbox" id="emergencyCheckbox" onchange="calculateTotal()">
                         <span>Emergency</span>
                     </label>
+
+                    <span class ="emergencyNote">(+ RM5 for Emergency Booking)</span>
                 </div>
                 <button type="submit" class="submitBtn">Submit</button>
             </div>
