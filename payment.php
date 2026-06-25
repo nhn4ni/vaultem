@@ -39,7 +39,7 @@ if ($conn->connect_error) {
 $student_id = $_SESSION['student_id'];
 $verifyStmt = $conn->prepare("
     SELECT b.Booking_ID, b.Booking_Status, b.DropOff_Date, b.Pickup_Date, rc.Residential_Block, p.Payment_Status, p.Amount,
-           (SELECT SUM(Quantity) FROM item WHERE Booking_ID = b.Booking_ID) AS Total_Items
+    (SELECT SUM(Quantity) FROM item WHERE Booking_ID = b.Booking_ID) AS Total_Items
     FROM booking b 
     LEFT JOIN payment p ON b.Booking_ID = p.Booking_ID 
     LEFT JOIN item i ON b.Booking_ID = i.Booking_ID
@@ -163,6 +163,8 @@ $conn->close();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VaulteM - Payment</title>
+        <link rel="icon" type="image/x-icon" href="vaultemLogo.ico">
+
     <style>
         * {
             font-family: 'Courier New', Courier, monospace;

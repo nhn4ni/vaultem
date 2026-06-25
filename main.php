@@ -17,6 +17,8 @@ $userName = $_SESSION['User_Name'] ?? 'User';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VaulteM – Dashboard</title>
+        <link rel="icon" type="image/x-icon" href="vaultemLogo.ico">
+
     <link rel="stylesheet" href="mobile.css">
     <style>
         * { font-family: 'Courier New', Courier, monospace; box-sizing: border-box; }
