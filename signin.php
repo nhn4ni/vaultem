@@ -35,8 +35,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_signin'])) {
     } elseif ($password !== $confirm) {
         $error = "Passwords do not match.";
     } elseif (strlen($password) < 6) {
-        $error = "Password must be at least 6 characters.";
-    } else {
+    $error = "Password must be at least 6 characters.";
+} elseif (!str_ends_with($email, '@student.utem.edu.my')) {
+    $error = "Please use your UTeM student email (@student.utem.edu.my).";
+} else {
 
         // Check if email already exists
         $emailEsc = mysqli_real_escape_string($conn, $email);
