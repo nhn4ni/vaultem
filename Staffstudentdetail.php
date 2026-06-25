@@ -112,6 +112,7 @@ $conn->close();
 </head>
 <body>
 <div id="wrapper">
+    <button class="back" onclick="history.back()">&#60; Back</button>
 
     <div class="leftcontainer">
         <header>

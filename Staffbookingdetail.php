@@ -268,6 +268,7 @@ $conn->close();
 </head>
 <body>
 <div id="wrapper">
+    <button class="back" onclick="history.back()">&#60; Back</button>
 
     <div class="leftcontainer">
         <header>
@@ -441,7 +442,7 @@ $conn->close();
                             <?php if ($uploadedPhoto): ?>
                                 <img src="<?php echo htmlspecialchars($uploadedPhoto); ?>" alt="Drop-off proof">
                             <?php else: ?>
-                                📷<br>No photo yet
+                                <br>No photo yet
                             <?php endif; ?>
                         </div>
                         <!-- Upload form -->
@@ -452,7 +453,7 @@ $conn->close();
                                    accept="image/*" style="display:none;"
                                    onchange="previewPhoto(this, <?php echo $bid; ?>); this.form.submit();">
                             <label for="dropoff-file-<?php echo $bid; ?>" class="upload-label">
-                                📷 Upload Photo
+                                 Upload Photo
                             </label>
                         </form>
                     </div>
@@ -465,7 +466,7 @@ $conn->close();
                         <?php if ($studentConfirmed): ?>
                             <p style="color:#22c55e; font-weight:600;">✓ Student has confirmed collection.</p>
                         <?php elseif ($verifSent): ?>
-                            <p style="color:#cfe2ff;">⏳ Verification sent — awaiting student confirmation.</p>
+                            <p style="color:#cfe2ff;"> Verification sent — awaiting student confirmation.</p>
                         <?php else: ?>
                             <p>Send verification request to student before releasing items.</p>
                             <p class="note">* Verify button only active when booking is Approved.</p>
@@ -475,7 +476,7 @@ $conn->close();
                         <?php if ($studentConfirmed): ?>
                             <span class="confirmed-tag">✓ Student Confirmed</span>
                         <?php elseif ($verifSent): ?>
-                            <span class="sent-tag">⏳ Awaiting Student</span>
+                            <span class="sent-tag"> Awaiting Student</span>
                         <?php elseif ($bstat === 'approved'): ?>
                             <form method="POST" style="display:inline;">
                                 <button type="submit" name="verify" class="verify-btn"
@@ -498,9 +499,9 @@ $conn->close();
         <div class="action-row">
             <?php if ($bstat === 'pending'): ?>
                 <form method="POST" style="display:inline">
-                    <button type="submit" name="approve" class="btn-approve">✓ Approve</button>
+                    <button type="submit" name="approve" class="btn-approve"> Approve</button>
                 </form>
-                <button class="btn-reject" onclick="document.getElementById('rejectModal').classList.add('show')">✕ Reject</button>
+                <button class="btn-reject" onclick="document.getElementById('rejectModal').classList.add('show')">Reject</button>
             <?php endif; ?>
         </div>
 

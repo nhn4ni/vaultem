@@ -157,6 +157,7 @@ $PENALTY_RATE = 2.00;
 </head>
 <body>
 <div id="wrapper">
+    <button class="back" onclick="history.back()">&#60; Back</button>
 
     <div class="leftcontainer">
         <header>
