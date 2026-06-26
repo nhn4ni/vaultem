@@ -228,11 +228,11 @@ $result = $conn->query($sql);
             <span id="currentName"><?php echo isset($_SESSION['Student_Name']) ? htmlspecialchars($_SESSION['Student_Name']) : 'Guest'; ?></span>
 
             <span id="profileContainer">
-                <img id="userImage" src="/image/user.png" width="20px" height="20px" onclick="profileMenu()">
+                <img id="userImage" src="image/user.png" width="20px" height="20px" onclick="profileMenu()">
                 <div id="profileSelect">
                     <button onclick="showProfile();">Profile</button>
                     <button onclick="window.location.href='settings.html'">Settings</button>
-                    <button onclick="window.location.href='settings.html'">Notification</button>
+                    <button onclick="window.location.href='studentverify.php'">Notification</button>
                     <button onclick="showLog();">Logout</button>
                 </div>
             </span>
@@ -359,7 +359,7 @@ $result = $conn->query($sql);
     <div id="logoutText">
         <p>Are you sure you want to logout?</p>
         <div id="logoutButton">
-            <button id="yesBTN" onclick="window.location.href='studentMAIN.html'">Yes</button>
+            <button id="yesBTN" onclick="window.location.href='index.php'">Yes</button>
             <button id="noBTN"  onclick="showLog()">No</button>
         </div>
     </div>
