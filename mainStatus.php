@@ -344,7 +344,7 @@ $result = $conn->query($sql);
                 <?php endif; ?>
 
                 <p class="pickup-note">
-                Note: Drop-off and Pick-up time is 8:00 AM - 11:00 PM only
+                Note: Drop-off and Pick-up time is 8:00 AM - 11:00 AM only
 </p>
             </div>
 
