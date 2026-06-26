@@ -103,7 +103,7 @@ $conn->close();
             Welcome,
             <span id="currentName"><?php echo htmlspecialchars($student_name); ?></span>
             <span id="profileContainer">
-                <img id="userImage" src="/image/user.png" width="20px" height="20px" onclick="profileMenu()">
+                <img id="userImage" src="image/user.png" width="20px" height="20px" onclick="profileMenu()">
                 <div id="profileSelect">
                     <button onclick="showLog()">Logout</button>
                 </div>
