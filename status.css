@@ -356,3 +356,22 @@
         .hidden{
             display: none !important;
         }
+
+        .status-card.emergency-card {
+            border: 2px solid #dc3545;
+            background-color: #fff5f5;
+        }
+
+        .student-card.emergency-card {
+            border: 2px solid #dc3545;
+            background-color: #fff5f5;
+        }
+
+        .emergency-badge {
+            background-color: #dc3545;
+            color: white;
+            font-size: 0.72rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: bold;
+        }

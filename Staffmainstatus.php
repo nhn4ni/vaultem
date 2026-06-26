@@ -27,7 +27,7 @@ $recentQ = $conn->query("
     LEFT JOIN item i ON b.Booking_ID = i.Booking_ID
     GROUP BY b.Booking_ID, b.Booking_Status, b.DropOff_Date, b.Pickup_Date,
              b.Booking_Priority, s.Student_Name, rc.Residential_Block
-    ORDER BY b.Booking_ID DESC
+    ORDER BY (b.Booking_Priority = 'Y') DESC, b.Booking_ID DESC
     LIMIT 5
 ");
 
@@ -188,7 +188,7 @@ $conn->close();
                 $isPrio = $row['Booking_Priority'] === 'Y';
                 $sc = strtolower($bstat) === 'pending' ? 'status-pending' : (strtolower($bstat) === 'approved' ? 'status-approved' : 'status-rejected');
         ?>
-        <div class="status-card">
+        <div class="status-card <?php echo $isPrio ? 'emergency-card' : ''; ?>">
             <div class="card-header">
                 <div class="header-main">
                     <span class="order-id">ID: <?php echo $row['Booking_ID']; ?></span>
