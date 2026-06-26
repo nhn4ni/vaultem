@@ -307,24 +307,6 @@ $result = $conn->query($sql);
             </div>
 
             <div class="summary-info">
-<<<<<<< HEAD
-                <p>Drop-off date : <?php echo date("d-m-Y", strtotime($row['DropOff_Date'])); ?></p>
-                <p>Pick-up date  : <?php echo date("d-m-Y", strtotime($row['Pickup_Date'])); ?></p>
-                <p>Item quantity : <?php echo htmlspecialchars($row['TotalItem'] ?? '0'); ?></p>
-                <p>College       : <?php echo htmlspecialchars($row['Residential_Block'] ?? 'N/A'); ?></p>
-                <p>Total fee     : RM <?php echo number_format((float)($row['TotalFee'] ?? 0), 2); ?></p>
-                
-                <?php
-                if ($isPaid) {
-                    $status = "Paid";
-                } elseif ($paymentStatus === 'p' || $paymentStatus === 'pending') {
-                    $status = "Pending Payment (Pay Later)";
-                } else {
-                    $status = "Pending Payment";
-                }
-                ?>
-                <p>Payment status: <?= $status ?></p>
-=======
                 <p>Drop-off date : <?php echo htmlspecialchars($row['DropOff_Date']); ?></p>
                 <p>Pick-up date  : <?php echo htmlspecialchars($row['Pickup_Date']); ?></p>
                 <p>Item quantity : <?php echo htmlspecialchars($row['TotalItem'] ?? '0'); ?></p>
@@ -337,7 +319,6 @@ $result = $conn->query($sql);
                 <p class="pickup-note">
                 Note: Drop-off and Pick-up time is 8:00 AM - 11:00 PM only
 </p>
->>>>>>> 631fdfb572aaf62747de957c51aff20cfbe14eb6
             </div>
 
             <div class="button-container">
