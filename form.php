@@ -18,11 +18,11 @@ $student_id = $_SESSION['Student_ID'] ?? 'S001';
 $studentIdEsc = mysqli_real_escape_string($conn, $student_id);
 
 $genderQuery = mysqli_query($conn, "SELECT Gender FROM student WHERE Student_ID = '$studentIdEsc'");
-$studentGender = 'M'; 
+$studentGender = 'M';
 
 if ($genderQuery && mysqli_num_rows($genderQuery) > 0) {
     $genderRow = mysqli_fetch_assoc($genderQuery);
-    $studentGender = $genderRow['Gender']; 
+    $studentGender = $genderRow['Gender'];
 } else {
     die("No student record found. Please log in again.");
 }
@@ -46,22 +46,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $student_id = $_SESSION['Student_ID'] ?? 'S001';
 
     $residentialCollege = $_POST['residentialCollege'] ?? '';
-    $dropOffDate = $_POST['dropOffDate'] ?? '';
-    $pickupDate = $_POST['pickupDate'] ?? '';
-    $bookingPriority = isset($_POST['emergency']) ? 'Y' : 'N';
-    $paymentStatus = 'N';
+    $dropOffDate        = $_POST['dropOffDate'] ?? '';
+    $pickupDate         = $_POST['pickupDate'] ?? '';
+    $bookingPriority    = isset($_POST['emergency']) ? 'Y' : 'N';
+    $paymentStatus      = 'N';
 
-    $bigBagQty = (int)($_POST['bigBagQty'] ?? 0);
-    $medBagQty = (int)($_POST['medBagQty'] ?? 0);
+    $bigBagQty   = (int)($_POST['bigBagQty']   ?? 0);
+    $medBagQty   = (int)($_POST['medBagQty']   ?? 0);
     $smallBagQty = (int)($_POST['smallBagQty'] ?? 0);
     $largeLugQty = (int)($_POST['largeLugQty'] ?? 0);
-    $medLugQty = (int)($_POST['medLugQty'] ?? 0);
+    $medLugQty   = (int)($_POST['medLugQty']   ?? 0);
     $smallLugQty = (int)($_POST['smallLugQty'] ?? 0);
-    $bigBoxQty = (int)($_POST['bigBoxQty'] ?? 0);
-    $medBoxQty = (int)($_POST['medBoxQty'] ?? 0);
+    $bigBoxQty   = (int)($_POST['bigBoxQty']   ?? 0);
+    $medBoxQty   = (int)($_POST['medBoxQty']   ?? 0);
     $smallBoxQty = (int)($_POST['smallBoxQty'] ?? 0);
-    $bucketQty = (int)($_POST['bucketQty'] ?? 0);
-    $otherQty = (int)($_POST['otherQty'] ?? 0);
+    $bucketQty   = (int)($_POST['bucketQty']   ?? 0);
+    $otherQty    = (int)($_POST['otherQty']    ?? 0);
 
     $totalItems = $bigBagQty + $medBagQty + $smallBagQty + $largeLugQty + $medLugQty
                 + $smallLugQty + $bigBoxQty + $medBoxQty + $smallBoxQty + $bucketQty + $otherQty;
@@ -75,28 +75,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $totalPrice =
-    ($bigBagQty * 7.00) +
-    ($medBagQty * 5.00) +
-    ($smallBagQty * 3.00) +
+        ($bigBagQty   * 7.00) +
+        ($medBagQty   * 5.00) +
+        ($smallBagQty * 3.00) +
+        ($largeLugQty * 10.00) +
+        ($medLugQty   * 8.00) +
+        ($smallLugQty * 6.00) +
+        ($bigBoxQty   * 5.00) +
+        ($medBoxQty   * 3.00) +
+        ($smallBoxQty * 2.00) +
+        ($bucketQty   * 3.00) +
+        ($otherQty    * 5.00);
 
-    ($largeLugQty * 10.00) +
-    ($medLugQty * 8.00) +
-    ($smallLugQty * 6.00) +
+    if ($bookingPriority === 'Y') {
+        $totalPrice += 5.00;
+    }
 
-    ($bigBoxQty * 5.00) +
-    ($medBoxQty * 3.00) +
-    ($smallBoxQty * 2.00) +
-
-    ($bucketQty * 3.00) +
-    ($otherQty * 5.00);
-
-if ($bookingPriority === 'Y') {
-    $totalPrice += 10.00;
-}
-    $studentIdEsc = mysqli_real_escape_string($conn, $student_id);
-    $residentialCollegeEsc = mysqli_real_escape_string($conn, $residentialCollege);
-    $dropOffDateEsc = mysqli_real_escape_string($conn, $dropOffDate);
-    $pickupDateEsc = mysqli_real_escape_string($conn, $pickupDate);
+    $studentIdEsc       = mysqli_real_escape_string($conn, $student_id);
+    $dropOffDateEsc     = mysqli_real_escape_string($conn, $dropOffDate);
+    $pickupDateEsc      = mysqli_real_escape_string($conn, $pickupDate);
 
     $residential_id = (int)($_POST['residentialCollege'] ?? 0);
 
@@ -126,22 +123,22 @@ if ($bookingPriority === 'Y') {
     mysqli_stmt_close($deductSpace);
 
     if (!mysqli_query($conn, "INSERT INTO payment (Payment_Method, Payment_Status, Payment_Date, Amount, Booking_ID)
-                             VALUES ('Online', '$paymentStatus', CURDATE(), $totalPrice, $booking_id)")) {
+                              VALUES ('Online', '$paymentStatus', CURDATE(), $totalPrice, $booking_id)")) {
         die("Payment insert failed: " . mysqli_error($conn));
     }
 
     $items = [
-        ['name' => 'Big Bag', 'size' => 'L', 'qty' => $bigBagQty],
-        ['name' => 'Medium Bag', 'size' => 'M', 'qty' => $medBagQty],
-        ['name' => 'Small Bag', 'size' => 'S', 'qty' => $smallBagQty],
-        ['name' => 'Large Luggage', 'size' => 'L', 'qty' => $largeLugQty],
+        ['name' => 'Big Bag',        'size' => 'L', 'qty' => $bigBagQty],
+        ['name' => 'Medium Bag',     'size' => 'M', 'qty' => $medBagQty],
+        ['name' => 'Small Bag',      'size' => 'S', 'qty' => $smallBagQty],
+        ['name' => 'Large Luggage',  'size' => 'L', 'qty' => $largeLugQty],
         ['name' => 'Medium Luggage', 'size' => 'M', 'qty' => $medLugQty],
-        ['name' => 'Small Luggage', 'size' => 'S', 'qty' => $smallLugQty],
-        ['name' => 'Big Box', 'size' => 'L', 'qty' => $bigBoxQty],
-        ['name' => 'Medium Box', 'size' => 'M', 'qty' => $medBoxQty],
-        ['name' => 'Small Box', 'size' => 'S', 'qty' => $smallBoxQty],
-        ['name' => 'Bucket/Pail', 'size' => 'M', 'qty' => $bucketQty],
-        ['name' => 'Other', 'size' => 'M', 'qty' => $otherQty],
+        ['name' => 'Small Luggage',  'size' => 'S', 'qty' => $smallLugQty],
+        ['name' => 'Big Box',        'size' => 'L', 'qty' => $bigBoxQty],
+        ['name' => 'Medium Box',     'size' => 'M', 'qty' => $medBoxQty],
+        ['name' => 'Small Box',      'size' => 'S', 'qty' => $smallBoxQty],
+        ['name' => 'Bucket/Pail',    'size' => 'M', 'qty' => $bucketQty],
+        ['name' => 'Other',          'size' => 'M', 'qty' => $otherQty],
     ];
 
     foreach ($items as $item) {
@@ -170,8 +167,7 @@ mysqli_close($conn);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VaulteM - Booking Form</title>
-        <link rel="icon" type="image/x-icon" href="vaultemLogo.ico">
-
+    <link rel="icon" type="image/x-icon" href="vaultemLogo.ico">
     <link rel="stylesheet" href="mobile.css" type="text/css">
     <style>
         * {
@@ -356,7 +352,7 @@ mysqli_close($conn);
             color: #7a6e93;
             font-weight: normal;
         }
-        
+
         .bagOption .itemPrice {
             color: #c9c3d8;
             font-size: 0.74rem;
@@ -486,14 +482,15 @@ mysqli_close($conn);
             width: 18px;
             height: 18px;
             cursor: pointer;
-}
-        .emergencyNote {
-        margin-left: 10px;
-        font-size: 0.9rem;
-        color: #ff0000e0;
-        font-weight: bold;
         }
-        
+
+        .emergencyNote {
+            margin-left: 10px;
+            font-size: 0.9rem;
+            color: #ff0000e0;
+            font-weight: bold;
+        }
+
         .submitBtn {
             background-color: #E8E9DE;
             color: #241253;
@@ -505,7 +502,7 @@ mysqli_close($conn);
             cursor: pointer;
         }
 
-        .submitBtn:hover{
+        .submitBtn:hover {
             background-color: #969696;
             cursor: pointer;
             transform: translateY(-2px);
@@ -522,13 +519,13 @@ mysqli_close($conn);
             cursor: pointer;
         }
 
-        #backBtn:hover{
+        #backBtn:hover {
             background-color: #a03333;
             cursor: pointer;
             transform: translateY(-2px);
         }
 
-        .selectBtn:hover{
+        .selectBtn:hover {
             background-color: #969696;
             cursor: pointer;
             transform: translateY(-2px);
@@ -563,18 +560,21 @@ mysqli_close($conn);
                     <?php
                     if ($collegeResult && mysqli_num_rows($collegeResult) > 0) {
                         while ($college = mysqli_fetch_assoc($collegeResult)) {
-                            $collegeName = $college['Residential_Block'];
+                            $collegeName    = $college['Residential_Block'];
                             $availableSpace = $college['Available_Space'];
                             ?>
                             <div class="collegeCard" data-space="<?php echo (int)$availableSpace; ?>">
                                 <h3><?php echo htmlspecialchars($collegeName); ?></h3>
                                 <p>Space : <span><?php echo (int)$availableSpace; ?></span> unit</p>
-                                <button type="button" class="selectBtn" onclick="selectCollege(this, '<?php echo htmlspecialchars($collegeName); ?>', <?php echo (int)$availableSpace; ?>, <?php echo $college['Residential_ID']; ?>)">Select</button>
+                                <button type="button" class="selectBtn"
+                                    onclick="selectCollege(this, '<?php echo htmlspecialchars($collegeName); ?>', <?php echo (int)$availableSpace; ?>, <?php echo $college['Residential_ID']; ?>)">
+                                    Select
+                                </button>
                             </div>
                             <?php
                         }
                     } else {
-                        echo "<p style='color: red;'>No residential colleges available found for your gendergit add.</p>";
+                        echo "<p style='color: red;'>No residential colleges available for your gender.</p>";
                     }
                     ?>
                 </div>
@@ -618,24 +618,25 @@ mysqli_close($conn);
                     <span>Quantity / Options</span>
                 </div>
                 <p id="itemLimitReminder" style="color: #e74c3c; font-size: 0.85rem; margin: -20px 0 20px 0;">
-                     Maximum 3 items per booking.
+                    * Maximum 3 items per booking.
                 </p>
 
+                <!-- Bag -->
                 <div class="itemRow">
                     <div class="itemLeft">
                         <span>Bag</span>
-                    <span class="itemPrice">Big RM7 | Medium RM5 | Small RM3</span>
+                        <span class="itemPrice">Big RM7 | Medium RM5 | Small RM3</span>
                         <div class="bagDropdown" id="bagDropdown">
                             <div class="bagOption">
-                                <span>Big Bag <span class="itemPrice">RM 0.50</span></span>
+                                <span>Big Bag <span class="itemPrice">RM 7.00</span></span>
                                 <input type="number" id="bigBagQty" name="bigBagQty" value="0" min="0" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                             <div class="bagOption">
-                                <span>Medium Bag <span class="itemPrice">RM 0.50</span></span>
+                                <span>Medium Bag <span class="itemPrice">RM 5.00</span></span>
                                 <input type="number" id="medBagQty" name="medBagQty" value="0" min="0" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                             <div class="bagOption">
-                                <span>Small Bag <span class="itemPrice">RM 0.50</span></span>
+                                <span>Small Bag <span class="itemPrice">RM 3.00</span></span>
                                 <input type="number" id="smallBagQty" name="smallBagQty" value="0" min="0" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                         </div>
@@ -643,21 +644,22 @@ mysqli_close($conn);
                     <button type="button" class="chooseBtn" data-target="bagDropdown">Choose &#9660;</button>
                 </div>
 
+                <!-- Luggage -->
                 <div class="itemRow">
                     <div class="itemLeft">
                         <span>Luggage</span>
                         <span class="itemPrice">Large RM10 | Medium RM8 | Small RM6</span>
                         <div class="bagDropdown" id="luggageDropdown">
                             <div class="bagOption">
-                                <span>Large Luggage <span class="itemPrice">RM 0.50</span></span>
-                                <input type="number" id="largeLugQty" name="largeLugQty" value="0" min="0" oninput="calculateTotal(); checkItemLimit();">
+                                <span>Large Luggage <span class="itemPrice">RM 10.00</span></span>
+                                <input type="number" id="largeLugQty" name="largeLugQty" value="0" min="0" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                             <div class="bagOption">
-                                <span>Medium Luggage <span class="itemPrice">RM 0.50</span></span>
+                                <span>Medium Luggage <span class="itemPrice">RM 8.00</span></span>
                                 <input type="number" id="medLugQty" name="medLugQty" value="0" min="0" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                             <div class="bagOption">
-                                <span>Small Luggage <span class="itemPrice">RM 0.50</span></span>
+                                <span>Small Luggage <span class="itemPrice">RM 6.00</span></span>
                                 <input type="number" id="smallLugQty" name="smallLugQty" value="0" min="0" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                         </div>
@@ -665,21 +667,22 @@ mysqli_close($conn);
                     <button type="button" class="chooseBtn" data-target="luggageDropdown">Choose &#9660;</button>
                 </div>
 
+                <!-- Box -->
                 <div class="itemRow">
                     <div class="itemLeft">
                         <span>Box</span>
-                        <span class="itemPrice">RM 0.50 / item</span>
+                        <span class="itemPrice">Big RM5 | Medium RM3 | Small RM2</span>
                         <div class="bagDropdown" id="boxDropdown">
                             <div class="bagOption">
-                                <span>Big Box <span class="itemPrice">RM 0.50</span></span>
+                                <span>Big Box <span class="itemPrice">RM 5.00</span></span>
                                 <input type="number" id="bigBoxQty" name="bigBoxQty" value="0" min="0" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                             <div class="bagOption">
-                                <span>Medium Box <span class="itemPrice">RM 0.50</span></span>
+                                <span>Medium Box <span class="itemPrice">RM 3.00</span></span>
                                 <input type="number" id="medBoxQty" name="medBoxQty" value="0" min="0" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                             <div class="bagOption">
-                                <span>Small Box <span class="itemPrice">RM 0.50</span></span>
+                                <span>Small Box <span class="itemPrice">RM 2.00</span></span>
                                 <input type="number" id="smallBoxQty" name="smallBoxQty" value="0" min="0" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                         </div>
@@ -687,18 +690,20 @@ mysqli_close($conn);
                     <button type="button" class="chooseBtn" data-target="boxDropdown">Choose &#9660;</button>
                 </div>
 
+                <!-- Bucket/Pail -->
                 <div class="itemRow">
                     <div class="itemLeft">
                         <span>Bucket/Pail</span>
-                        <span class="itemPrice">RM 0.50 / item</span>
+                        <span class="itemPrice">RM 3.00 / item</span>
                     </div>
                     <input id="bucketInput" type="number" name="bucketQty" min="0" value="0" oninput="calculateTotal(); checkItemLimit()">
                 </div>
 
+                <!-- Others -->
                 <div class="itemRow">
                     <div class="itemLeft">
                         <span>Others</span>
-                        <span class="itemPrice">RM 0.50 / item</span>
+                        <span class="itemPrice">RM 5.00 / item</span>
                     </div>
                     <input id="otherQty" type="number" name="otherQty" min="0" value="0" oninput="calculateTotal(); checkItemLimit()">
                 </div>
@@ -716,14 +721,12 @@ mysqli_close($conn);
             </div>
 
             <div class="rightFooterSection">
-
                 <div class="emergencySection">
                     <label>
                         <input type="checkbox" id="emergencyCheckbox" onchange="calculateTotal(); checkItemLimit()">
                         <span>Emergency</span>
                     </label>
-
-                    <span class ="emergencyNote">(+ RM5 for Emergency Booking)</span>
+                    <span class="emergencyNote">(+ RM5 for Emergency Booking)</span>
                 </div>
                 <button type="button" id="backBtn" onclick="window.location.href='mainStatus.php'">Cancel</button>
                 <button type="submit" class="submitBtn">Submit</button>
@@ -736,8 +739,8 @@ mysqli_close($conn);
         let collegeSpaces = {};
         let selectedCollegeName = "";
 
-        document.addEventListener('DOMContentLoaded', function() {
-            document.querySelectorAll('.collegeCard').forEach(function(card) {
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.collegeCard').forEach(function (card) {
                 let name  = card.querySelector('h3').textContent.trim();
                 let space = parseInt(card.getAttribute('data-space')) || 0;
                 collegeSpaces[name] = space;
@@ -761,7 +764,7 @@ mysqli_close($conn);
         function reduceCollegeSpace(collegeName, units) {
             if (collegeSpaces.hasOwnProperty(collegeName)) {
                 collegeSpaces[collegeName] -= units;
-                document.querySelectorAll('.collegeCard').forEach(function(card) {
+                document.querySelectorAll('.collegeCard').forEach(function (card) {
                     let name = card.querySelector('h3').textContent.trim();
                     let btn  = card.querySelector('.selectBtn');
                     if (name === collegeName) {
@@ -809,15 +812,15 @@ mysqli_close($conn);
                 }
             });
 
-                const dropdownInputs = [
-                    'bigBagQty', 'medBagQty', 'smallBagQty',
-                    'largeLugQty', 'medLugQty', 'smallLugQty',
-                    'bigBoxQty', 'medBoxQty', 'smallBoxQty'
-                ];
+            const dropdownInputs = [
+                'bigBagQty', 'medBagQty', 'smallBagQty',
+                'largeLugQty', 'medLugQty', 'smallLugQty',
+                'bigBoxQty', 'medBoxQty', 'smallBoxQty'
+            ];
 
-                dropdownInputs.forEach(id => {
-                    const input = document.getElementById(id);
-                    const val = parseInt(input.value) || 0;
+            dropdownInputs.forEach(id => {
+                const input = document.getElementById(id);
+                const val   = parseInt(input.value) || 0;
 
                 if (limitReached && val === 0) {
                     input.disabled = true;
@@ -831,10 +834,10 @@ mysqli_close($conn);
             });
 
             const bucketInput = document.getElementById('bucketInput');
-            const otherInput = document.getElementById('otherQty');
+            const otherInput  = document.getElementById('otherQty');
 
             bucketInput.disabled = limitReached && (parseInt(bucketInput.value) || 0) === 0;
-            otherInput.disabled  = limitReached && (parseInt(otherInput.value) || 0) === 0;
+            otherInput.disabled  = limitReached && (parseInt(otherInput.value)  || 0) === 0;
 
             bucketInput.style.backgroundColor = bucketInput.disabled ? '#cccccc' : '#ffffff';
             otherInput.style.backgroundColor  = otherInput.disabled  ? '#cccccc' : '#ffffff';
@@ -842,17 +845,14 @@ mysqli_close($conn);
 
         function selectCollege(button, collegeName, availableSpace, collegeId) {
             let currentSpace = getCollegeSpace(collegeName);
-            if (currentSpace <= 0) {
-                return;
-            }
+            if (currentSpace <= 0) return;
 
-            let allButtons = document.querySelectorAll('.selectBtn');
-            for (let i = 0; i < allButtons.length; i++) {
-                if (!allButtons[i].classList.contains('full')) {
-                    allButtons[i].textContent = "Select";
-                    allButtons[i].classList.remove('selectCollege');
+            document.querySelectorAll('.selectBtn').forEach(btn => {
+                if (!btn.classList.contains('full')) {
+                    btn.textContent = "Select";
+                    btn.classList.remove('selectCollege');
                 }
-            }
+            });
 
             button.textContent = "Selected";
             button.classList.add('selectCollege');
@@ -863,79 +863,76 @@ mysqli_close($conn);
         const currentYear = new Date().getFullYear();
         document.getElementById('currentYear').innerHTML = currentYear;
 
-        const dropOffDay = document.getElementById('dropOffDay');
+        const dropOffDay   = document.getElementById('dropOffDay');
         const dropOffMonth = document.getElementById('dropOffMonth');
-        const pickupDay = document.getElementById('pickupDay');
-        const pickupMonth = document.getElementById('pickupMonth');
+        const pickupDay    = document.getElementById('pickupDay');
+        const pickupMonth  = document.getElementById('pickupMonth');
 
         function getDaysInMonth(monthIndex) {
             return new Date(currentYear, monthIndex + 1, 0).getDate();
         }
 
         function initDates() {
-            const today = new Date();
+            const today      = new Date();
             const todayMonth = today.getMonth();
-            const todayDay = today.getDate();
+            const todayDay   = today.getDate();
 
-            dropOffMonth.innerHTML = '';
             const allMonths = ['January','February','March','April','May','June',
                                'July','August','September','October','November','December'];
 
-            for (let m = todayMonth; m < 12; m++) {
-                let opt = document.createElement('option');
-                opt.value = m;
-                opt.textContent = allMonths[m];
-                dropOffMonth.appendChild(opt);
-            }
-            dropOffMonth.selectedIndex = 0;
+            dropOffMonth.innerHTML = '';
+            pickupMonth.innerHTML  = '';
 
-            pickupMonth.innerHTML = '';
             for (let m = todayMonth; m < 12; m++) {
-                let opt = document.createElement('option');
-                opt.value = m;
-                opt.textContent = allMonths[m];
-                pickupMonth.appendChild(opt);
+                let opt1 = document.createElement('option');
+                opt1.value = m;
+                opt1.textContent = allMonths[m];
+                dropOffMonth.appendChild(opt1);
+
+                let opt2 = document.createElement('option');
+                opt2.value = m;
+                opt2.textContent = allMonths[m];
+                pickupMonth.appendChild(opt2);
             }
-            pickupMonth.selectedIndex = 0;
+
+            dropOffMonth.selectedIndex = 0;
+            pickupMonth.selectedIndex  = 0;
 
             function fillDaysFiltered(selectElement, monthIndex, restrictToToday, isPickup) {
                 let totalDays = getDaysInMonth(monthIndex);
-                let startDay = 1;
+                let startDay  = 1;
 
                 if (restrictToToday && monthIndex === todayMonth) {
-                    startDay = todayDay;
-                    if (isPickup) {
-                        startDay = todayDay + 1;
-                    }
+                    startDay = isPickup ? todayDay + 1 : todayDay;
                 }
 
                 selectElement.innerHTML = '';
                 for (let i = startDay; i <= totalDays; i++) {
                     let opt = document.createElement('option');
-                    opt.value = i < 10 ? '0' + i : '' + i;
+                    opt.value       = i < 10 ? '0' + i : '' + i;
                     opt.textContent = i;
                     selectElement.appendChild(opt);
                 }
             }
 
             fillDaysFiltered(dropOffDay, todayMonth, true);
-            fillDaysFiltered(pickupDay, todayMonth, true, true);
+            fillDaysFiltered(pickupDay,  todayMonth, true, true);
 
-            dropOffMonth.addEventListener('change', function() {
+            dropOffMonth.addEventListener('change', function () {
                 let selectedMonth = parseInt(dropOffMonth.value);
                 fillDaysFiltered(dropOffDay, selectedMonth, selectedMonth === todayMonth);
             });
 
-            pickupMonth.addEventListener('change', function() {
+            pickupMonth.addEventListener('change', function () {
                 let selectedMonth = parseInt(pickupMonth.value);
-                fillDaysFiltered(pickupDay, selectedMonth, selectedMonth === todayMonth);
+                fillDaysFiltered(pickupDay, selectedMonth, selectedMonth === todayMonth, true);
             });
         }
 
         function initDropdowns() {
             document.querySelectorAll('.chooseBtn').forEach(button => {
-                button.addEventListener('click', function() {
-                    const targetId = this.getAttribute('data-target');
+                button.addEventListener('click', function () {
+                    const targetId       = this.getAttribute('data-target');
                     const targetDropdown = document.getElementById(targetId);
 
                     if (targetDropdown.classList.contains('show')) {
@@ -957,36 +954,27 @@ mysqli_close($conn);
                 'bucketInput', 'otherQty'
             ];
 
-            let totalItems = 0;
             qtyInputs.forEach(id => {
                 let val = parseInt(document.getElementById(id).value) || 0;
-                if (val < 0) {
-                    val = 0;
-                    document.getElementById(id).value = 0;
-                }
-                totalItems += val;
+                if (val < 0) document.getElementById(id).value = 0;
             });
 
             let basePrice =
-    (parseInt(document.getElementById('bigBagQty').value) || 0) * 7 +
-    (parseInt(document.getElementById('medBagQty').value) || 0) * 5 +
-    (parseInt(document.getElementById('smallBagQty').value) || 0) * 3 +
+                (parseInt(document.getElementById('bigBagQty').value)   || 0) * 7  +
+                (parseInt(document.getElementById('medBagQty').value)   || 0) * 5  +
+                (parseInt(document.getElementById('smallBagQty').value) || 0) * 3  +
+                (parseInt(document.getElementById('largeLugQty').value) || 0) * 10 +
+                (parseInt(document.getElementById('medLugQty').value)   || 0) * 8  +
+                (parseInt(document.getElementById('smallLugQty').value) || 0) * 6  +
+                (parseInt(document.getElementById('bigBoxQty').value)   || 0) * 5  +
+                (parseInt(document.getElementById('medBoxQty').value)   || 0) * 3  +
+                (parseInt(document.getElementById('smallBoxQty').value) || 0) * 2  +
+                (parseInt(document.getElementById('bucketInput').value) || 0) * 3  +
+                (parseInt(document.getElementById('otherQty').value)    || 0) * 5;
 
-    (parseInt(document.getElementById('largeLugQty').value) || 0) * 10 +
-    (parseInt(document.getElementById('medLugQty').value) || 0) * 8 +
-    (parseInt(document.getElementById('smallLugQty').value) || 0) * 6 +
-
-    (parseInt(document.getElementById('bigBoxQty').value) || 0) * 5 +
-    (parseInt(document.getElementById('medBoxQty').value) || 0) * 3 +
-    (parseInt(document.getElementById('smallBoxQty').value) || 0) * 2 +
-
-    (parseInt(document.getElementById('bucketInput').value) || 0) * 3 +
-    (parseInt(document.getElementById('otherQty').value) || 0) * 5;
-
-const isEmergency = document.getElementById('emergencyCheckbox').checked;
-if (isEmergency) {
-    basePrice += 5;
-}
+            if (document.getElementById('emergencyCheckbox').checked) {
+                basePrice += 5;
+            }
 
             document.getElementById('totalPrice').textContent = basePrice.toFixed(2);
         }
@@ -1019,20 +1007,19 @@ if (isEmergency) {
                 return false;
             }
 
-
             let spaceAvailable = getCollegeSpace(selectedCollegeName);
             if (totalItems > spaceAvailable) {
                 alert(`Insufficient storage capacity in ${selectedCollegeName}. Only ${spaceAvailable} units remaining.`);
                 return false;
             }
 
-            let dropMonthNum = parseInt(dropOffMonth.value) + 1;
+            let dropMonthNum      = parseInt(dropOffMonth.value) + 1;
             let formattedDropMonth = dropMonthNum < 10 ? '0' + dropMonthNum : dropMonthNum;
-            let fullDropOffDate = `${currentYear}-${formattedDropMonth}-${dropOffDay.value}`;
+            let fullDropOffDate    = `${currentYear}-${formattedDropMonth}-${dropOffDay.value}`;
 
-            let pickMonthNum = parseInt(pickupMonth.value) + 1;
+            let pickMonthNum      = parseInt(pickupMonth.value) + 1;
             let formattedPickMonth = pickMonthNum < 10 ? '0' + pickMonthNum : pickMonthNum;
-            let fullPickupDate = `${currentYear}-${formattedPickMonth}-${pickupDay.value}`;
+            let fullPickupDate     = `${currentYear}-${formattedPickMonth}-${pickupDay.value}`;
 
             if (new Date(fullPickupDate) <= new Date(fullDropOffDate)) {
                 alert("Invalid configuration: Pickup date must occur after the drop-off date.");
@@ -1040,10 +1027,10 @@ if (isEmergency) {
             }
 
             document.getElementById('dropOffDate').value = fullDropOffDate;
-            document.getElementById('pickupDate').value = fullPickupDate;
+            document.getElementById('pickupDate').value  = fullPickupDate;
 
             if (document.getElementById('emergencyCheckbox').checked) {
-                document.getElementById('emergency').name = "emergency";
+                document.getElementById('emergency').name  = "emergency";
                 document.getElementById('emergency').value = "Y";
             } else {
                 document.getElementById('emergency').removeAttribute('name');

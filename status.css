@@ -334,8 +334,10 @@
             background-color: #f1f0ea;
             padding: 30px;
             border-radius: 20px;
-            width: 300px;
+            width: 460px;
             text-align: center;
+            word-break: break-all;
+            overflow-wrap: break-word;
         }
 
         #profileBTN{
@@ -355,4 +357,23 @@
 
         .hidden{
             display: none !important;
+        }
+
+        .status-card.emergency-card {
+            border: 2px solid #dc3545;
+            background-color: #fff5f5;
+        }
+
+        .student-card.emergency-card {
+            border: 2px solid #dc3545;
+            background-color: #fff5f5;
+        }
+
+        .emergency-badge {
+            background-color: #dc3545;
+            color: white;
+            font-size: 0.72rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: bold;
         }

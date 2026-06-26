@@ -185,3 +185,13 @@ p{
 .password-box i:hover{
     color: #000;
 }
+
+.rightcontainer a {
+    color: #ffffff; /* putih terang */
+    font-weight: bold;
+    text-decoration: underline;
+}
+
+.rightcontainer a:hover {
+    color: #ffd369; /* hover kuning supaya nampak */
+}

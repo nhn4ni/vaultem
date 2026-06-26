@@ -22,13 +22,14 @@ if ($search) {
 $students = $conn->query("
     SELECT s.Student_ID, s.Student_Name, s.Student_Mail, s.Student_PhoneNo, s.Gender,
            rc.Residential_Block,
-           COUNT(b.Booking_ID) AS TotalBookings
+           COUNT(b.Booking_ID) AS TotalBookings,
+           MAX(b.Booking_Priority = 'Y') AS HasEmergency
     FROM student s
     LEFT JOIN residential_college rc ON s.Residential_ID = rc.Residential_ID
     LEFT JOIN booking b ON s.Student_ID = b.Student_ID
     $searchSql
     GROUP BY s.Student_ID, s.Student_Name, s.Student_Mail, s.Student_PhoneNo, s.Gender, rc.Residential_Block
-    ORDER BY s.Student_Name ASC
+    ORDER BY HasEmergency DESC, s.Student_Name ASC
 ");
 
 $conn->close();
@@ -174,10 +175,16 @@ $conn->close();
             while ($st = $students->fetch_assoc()):
                 $initial = strtoupper(substr($st['Student_Name'], 0, 1));
         ?>
-        <div class="student-card">
-            <div class="student-avatar"><?php echo $initial; ?></div>
-            <div class="student-info">
-                <h4><?php echo htmlspecialchars($st['Student_Name']); ?></h4>
+            <div class="student-card <?php echo $st['HasEmergency'] ? 'emergency-card' : ''; ?>">
+                <div class="student-avatar"><?php echo $initial; ?></div>
+                <div class="student-info">
+                    <h4>
+                        <?php echo htmlspecialchars($st['Student_Name']); ?>
+                        <?php if ($st['HasEmergency']): ?>
+                            <span class="emergency-badge" >EMERGENCY</span>
+                        <?php endif; ?>
+                    </h4>
+
                 <p><?php echo htmlspecialchars($st['Student_ID']); ?> · <?php echo htmlspecialchars($st['Student_Mail']); ?></p>
                 <p><?php echo htmlspecialchars($st['Residential_Block'] ?? 'N/A'); ?> · <?php echo $st['Gender'] === 'M' ? 'Male' : ($st['Gender'] === 'F' ? 'Female' : 'N/A'); ?></p>
             </div>

@@ -12,6 +12,23 @@ if ($conn->connect_error) {
     die("Connection Failed: " . $conn->connect_error);
 }
 
+// ── Ensure Student_Mail is in session ──────────────────────────────────────
+if (!isset($_SESSION['Student_Mail']) || empty($_SESSION['Student_Mail'])) {
+    $student_id = $_SESSION['Student_ID'];
+    $emailQuery = "SELECT Student_Mail FROM student WHERE Student_ID = ?";
+    $emailStmt = $conn->prepare($emailQuery);
+    $emailStmt->bind_param("s", $student_id);
+    $emailStmt->execute();
+    $emailResult = $emailStmt->get_result();
+    
+    if ($emailRow = $emailResult->fetch_assoc()) {
+        $_SESSION['Student_Mail'] = $emailRow['Student_Mail'];
+    }
+    $emailStmt->close();
+}
+
+
+
 // ── Handle Booking Cancellation (Permanent Removal) ──────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_booking_id'])) {
     $cancelID = intval($_POST['cancel_booking_id']);
@@ -31,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_booking_id']))
     $verifyResult = $verifyStmt->get_result();
 
     if ($verifyResult->num_rows > 0) {
-        // Get total items + space being cancelled
+
         $getItems = $conn->prepare("SELECT SUM(Quantity) AS total, Space_ID FROM item WHERE Booking_ID = ? GROUP BY Space_ID");
         $getItems->bind_param("i", $cancelID);
         $getItems->execute();
@@ -210,6 +227,16 @@ $result = $conn->query($sql);
         color: #dc3545;
         font-weight: bold;
         }
+        .first-booking-link {
+        color: #209708;   /* merah terang */
+        font-weight: bold;
+        text-decoration: underline;
+        }
+
+        .first-booking-link:hover {
+        color: #209708;
+        }
+        
     </style>
 </head>
 <body>
@@ -231,7 +258,7 @@ $result = $conn->query($sql);
                 <img id="userImage" src="image/user.png" width="20px" height="20px" onclick="profileMenu()">
                 <div id="profileSelect">
                     <button onclick="showProfile();">Profile</button>
-                    <button onclick="window.location.href='settings.html'">Settings</button>
+                    <button onclick="window.location.href='settings.php'">Settings</button>
                     <button onclick="window.location.href='studentverify.php'">Notification</button>
                     <button onclick="showLog();">Logout</button>
                 </div>
@@ -327,7 +354,7 @@ $result = $conn->query($sql);
                 <?php endif; ?>
 
                 <p class="pickup-note">
-                Note: Drop-off and Pick-up time is 8:00 AM - 11:00 PM only
+                Note: Drop-off and Pick-up time is 8:00 AM - 11:00 AM only
 </p>
             </div>
 
@@ -355,8 +382,10 @@ $result = $conn->query($sql);
         </div>
         <?php endwhile;
         else: ?>
-            <p>No bookings found. <a href="form.php">Make your first booking!</a></p>
-        <?php endif; ?>
+            <p class="no-booking">
+    No bookings found. <a href="form.php" class="first-booking-link">Make your first booking!</a>
+</p>
+<?php endif; ?>
 
     </div>
 </div>
@@ -379,7 +408,7 @@ $result = $conn->query($sql);
     <div id="profileShortDetails">
         <h3>Profile</h3>
         <p>Name  : <span><?php echo isset($_SESSION['Student_Name']) ? htmlspecialchars($_SESSION['Student_Name']) : ''; ?></span></p>
-        <p>Email : <span><?php echo isset($_SESSION['Student_Mail'])     ? htmlspecialchars($_SESSION['Student_Mail'])     : ''; ?></span></p>
+        <p>Email : <span><?php echo isset($_SESSION['Email']) ? htmlspecialchars($_SESSION['Email']) : ''; ?></span></p>
         <div id="profileBTN">
             <button id="close" onclick="showProfile()">Close</button>
         </div>

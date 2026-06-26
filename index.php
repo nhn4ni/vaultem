@@ -1,3 +1,5 @@
+
+
 <!DOCTYPE html>
 <html lang="en">
 <!-- <link rel="stylesheet" href="vaultem.css" type="text/css"> -->
@@ -97,7 +99,7 @@
         <!--welcome page -->
         <div class="main">
             <p>UTeM Store Management</p>
-            <a href="signin.php"><button>Sign in</button></a>
+            <a href="signin.php"><button>Sign up</button></a>
             <a href="login.php"><button>Log in</button></a>
             <p></p>
         </div>
