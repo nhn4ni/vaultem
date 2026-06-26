@@ -159,4 +159,29 @@ p{
     display: none !important;
 }
 
+.password-box{
+    position: relative;
+    width: 100%;
+    max-width: 700px;
+    margin-bottom: 20px;
+}
 
+.password-box input{
+    width: 100%;
+    display: block;
+    padding: 15px 50px 15px 15px;
+    margin-bottom: 0;
+}
+.password-box i{
+    position: absolute;
+    right: 18px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: #555;
+    font-size: 18px;
+    z-index: 2;
+}
+.password-box i:hover{
+    color: #000;
+}

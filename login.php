@@ -87,6 +87,8 @@ $conn->close();
 
     <link rel="stylesheet" href="login.css">
     <link rel="stylesheet" href="mobile.css">
+    <link rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
 </head>
 <body>
 <div id="wrapper">
@@ -110,7 +112,14 @@ $conn->close();
 
         <form action="login.php" method="POST">
             <input type="email"    name="userEmail"    placeholder="Email"    required>
-            <input type="password" name="userPassword" placeholder="Password" required>
+            <div class="password-box">
+        <input type="password"
+                name="userPassword"
+                id="password"
+                placeholder="Password"
+                required>
+                <i class="fa-solid fa-eye" id="togglePassword"></i>
+            </div>
             <button type="submit">Log in</button>
         </form>
 
@@ -122,5 +131,24 @@ $conn->close();
         </p>
     </div>
 </div>
+
+<script>
+const togglePassword = document.getElementById("togglePassword");
+const password = document.getElementById("password");
+
+togglePassword.addEventListener("click", function () {
+
+    if (password.type === "password") {
+        password.type = "text";
+        this.classList.remove("fa-eye");
+        this.classList.add("fa-eye-slash");
+    } else {
+        password.type = "password";
+        this.classList.remove("fa-eye-slash");
+        this.classList.add("fa-eye");
+    }
+
+});
+</script>
 </body>
 </html>
