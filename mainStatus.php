@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_booking_id']))
     $verifyResult = $verifyStmt->get_result();
 
     if ($verifyResult->num_rows > 0) {
-        // Get total items + space being cancelled
+
         $getItems = $conn->prepare("SELECT SUM(Quantity) AS total, Space_ID FROM item WHERE Booking_ID = ? GROUP BY Space_ID");
         $getItems->bind_param("i", $cancelID);
         $getItems->execute();
@@ -228,7 +228,7 @@ $result = $conn->query($sql);
             <span id="currentName"><?php echo isset($_SESSION['Student_Name']) ? htmlspecialchars($_SESSION['Student_Name']) : 'Guest'; ?></span>
 
             <span id="profileContainer">
-                <img id="userImage" src="/image/user.png" width="20px" height="20px" onclick="profileMenu()">
+                <img id="userImage" src="image/user.png" width="20px" height="20px" onclick="profileMenu()">
                 <div id="profileSelect">
                     <button onclick="showProfile();">Profile</button>
                     <button onclick="window.location.href='settings.html'">Settings</button>
