@@ -227,6 +227,16 @@ $result = $conn->query($sql);
         color: #dc3545;
         font-weight: bold;
         }
+        .first-booking-link {
+        color: #209708;   /* merah terang */
+        font-weight: bold;
+        text-decoration: underline;
+        }
+
+        .first-booking-link:hover {
+        color: #209708;
+        }
+        
     </style>
 </head>
 <body>
@@ -362,8 +372,10 @@ $result = $conn->query($sql);
         </div>
         <?php endwhile;
         else: ?>
-            <p>No bookings found. <a href="form.php">Make your first booking!</a></p>
-        <?php endif; ?>
+            <p class="no-booking">
+    No bookings found. <a href="form.php" class="first-booking-link">Make your first booking!</a>
+</p>
+<?php endif; ?>
 
     </div>
 </div>
@@ -386,7 +398,7 @@ $result = $conn->query($sql);
     <div id="profileShortDetails">
         <h3>Profile</h3>
         <p>Name  : <span><?php echo isset($_SESSION['Student_Name']) ? htmlspecialchars($_SESSION['Student_Name']) : ''; ?></span></p>
-        <p>Email : <span><?php echo isset($_SESSION['Student_Mail'])     ? htmlspecialchars($_SESSION['Student_Mail'])     : ''; ?></span></p>
+        <p>Email : <span><?php echo isset($_SESSION['Email']) ? htmlspecialchars($_SESSION['Email']) : ''; ?></span></p>
         <div id="profileBTN">
             <button id="close" onclick="showProfile()">Close</button>
         </div>
