@@ -12,6 +12,23 @@ if ($conn->connect_error) {
     die("Connection Failed: " . $conn->connect_error);
 }
 
+// ── Ensure Student_Mail is in session ──────────────────────────────────────
+if (!isset($_SESSION['Student_Mail']) || empty($_SESSION['Student_Mail'])) {
+    $student_id = $_SESSION['Student_ID'];
+    $emailQuery = "SELECT Student_Mail FROM student WHERE Student_ID = ?";
+    $emailStmt = $conn->prepare($emailQuery);
+    $emailStmt->bind_param("s", $student_id);
+    $emailStmt->execute();
+    $emailResult = $emailStmt->get_result();
+    
+    if ($emailRow = $emailResult->fetch_assoc()) {
+        $_SESSION['Student_Mail'] = $emailRow['Student_Mail'];
+    }
+    $emailStmt->close();
+}
+
+
+
 // ── Handle Booking Cancellation (Permanent Removal) ──────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_booking_id'])) {
     $cancelID = intval($_POST['cancel_booking_id']);
@@ -241,7 +258,7 @@ $result = $conn->query($sql);
                 <img id="userImage" src="image/user.png" width="20px" height="20px" onclick="profileMenu()">
                 <div id="profileSelect">
                     <button onclick="showProfile();">Profile</button>
-                    <button onclick="window.location.href='settings.html'">Settings</button>
+                    <button onclick="window.location.href='settings.php'">Settings</button>
                     <button onclick="window.location.href='studentverify.php'">Notification</button>
                     <button onclick="showLog();">Logout</button>
                 </div>

@@ -50,6 +50,7 @@ $conn->close();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VaulteM – Item Collection</title>
+    <link rel="icon" type="image/x-icon" href="vaultemLogo.ico">
     <link rel="stylesheet" href="status.css">
     <link rel="stylesheet" href="mobile.css">
     <style>
@@ -87,7 +88,7 @@ $conn->close();
 </head>
 <body>
 <div id="wrapper">
-
+<button class="back" onclick="history.back()">&#60; Back</button>
     <div class="leftcontainer">
         <header>
             <h1 onclick="window.location.href='mainStatus.php'" style="cursor:pointer;">VaulteM</h1>

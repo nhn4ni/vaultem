@@ -145,10 +145,11 @@ mysqli_close($conn);
                 justify-content: center;
                 align-items: center;
                 min-height: 100vh;
+                overflow: hidden;
             }
 
             .rightcontainer {
-                width: 90%;
+                width: 100%;
                 margin: 0 auto;
             }
 
@@ -166,8 +167,8 @@ mysqli_close($conn);
     </style>
 </head>
 <body>
+    <button class="back" onclick="history.back()">&#60; Back</button>
     <div class="container">
-        <button class="back" onclick="history.back()">&#60; Back</button>
 
         <div class="leftcontainer">
             <header>
@@ -208,7 +209,6 @@ mysqli_close($conn);
     </div>
 
     <script>
-        // Auto-dismiss after 8 seconds
         const toast = document.getElementById('toast');
 
         function dismissToast() {
