@@ -59,7 +59,7 @@ if ($verifyResult->num_rows === 0) {
 $bookingData = $verifyResult->fetch_assoc();
 
 // Check if already paid
-if ($bookingData['Payment_Status'] === 'Paid' || $bookingData['Payment_Status'] === 'P') {
+if ($bookingData['Payment_Status'] === 'Y') {
     ?>
     <script>
         alert("This booking has already been paid.");
@@ -92,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     // --- CASE 1: USER CHOSE TO PAY LATER ---
     if (isset($_POST['action']) && $_POST['action'] === 'pay_later') {
-        $status = "Pending"; // Payment record keeps standard Pending status
+        $status = "N"; // Pay Later — not yet paid
         $date = null;        // No payment date yet
 
         $checkStmt = $conn->prepare("SELECT Payment_ID FROM payment WHERE Booking_ID = ?");
@@ -123,7 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // --- CASE 2: USER CHOSE TO PAY NOW ---
     elseif (isset($_POST['payment_method'])) {
         $method = $_POST['payment_method'];
-        $status = "P";
+        $status = "Y"; // Pay Now — payment completed
         $date = date("Y-m-d");
 
         $checkStmt = $conn->prepare("SELECT Payment_ID FROM payment WHERE Booking_ID = ?");
@@ -140,12 +140,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         if ($stmt->execute()) {
-            $updateBooking = $conn->prepare("UPDATE booking SET Booking_Status = 'Approved' WHERE Booking_ID = ?");
-            $updateBooking->bind_param("s", $bookingID);
+
+            // ── Storage capacity check (per residential college) ──────────────
+            // Get this student's residential ID
+            $residentialID = null;
+            $rRes = $conn->query("SELECT Residential_ID FROM student WHERE Student_ID = '$student_id'");
+            if ($rRes && $rRes->num_rows > 0) {
+                $residentialID = $rRes->fetch_assoc()['Residential_ID'];
+            }
+
+            // Total capacity of that college's storage spaces
+            $storageTotal = 0;
+            if ($residentialID) {
+                $capRes = $conn->query("SELECT COALESCE(SUM(Size),0) AS cap FROM storespace WHERE Residential_ID = '$residentialID'");
+                if ($capRes) $storageTotal = (int)$capRes->fetch_assoc()['cap'];
+            }
+
+            // Items already stored (approved bookings) in same college
+            $storageUsed = 0;
+            if ($residentialID) {
+                $usedRes = $conn->query("
+                    SELECT COALESCE(SUM(i.Quantity),0) AS used
+                    FROM item i
+                    JOIN booking b ON i.Booking_ID = b.Booking_ID
+                    JOIN student s ON b.Student_ID  = s.Student_ID
+                    WHERE LOWER(b.Booking_Status) = 'approved'
+                      AND s.Residential_ID = '$residentialID'
+                ");
+                if ($usedRes) $storageUsed = (int)$usedRes->fetch_assoc()['used'];
+            }
+
+            $storagePct = ($storageTotal > 0) ? ($storageUsed / $storageTotal) * 100 : 0;
+
+            // >= 60% → staff must approve; < 60% → auto-approve
+            $newStatus = ($storagePct >= 60) ? 'Pending' : 'Approved';
+
+            $updateBooking = $conn->prepare("UPDATE booking SET Booking_Status = ? WHERE Booking_ID = ?");
+            $updateBooking->bind_param("ss", $newStatus, $bookingID);
             $updateBooking->execute();
             $updateBooking->close();
-            
+
             $paymentSuccess = true;
+            $_SESSION['booking_new_status'] = $newStatus;
         } else {
             echo "Error: " . $stmt->error;
         }
@@ -453,9 +489,17 @@ $conn->close();
         <div id="payPopup" class="popupOverlay <?php echo ($paymentSuccess || $payLaterSuccess) ? 'show' : ''; ?>">
             <div class="popupBox">
                 <?php if ($paymentSuccess): ?>
-                    <p>Your payment of <strong>RM <?php echo number_format((float)$amount, 2); ?></strong> was successful!</p>
+                    <p>✓ Payment of <strong>RM <?php echo number_format((float)$amount, 2); ?></strong> successful!</p>
+                    <?php
+                    $newStatus = $_SESSION['booking_new_status'] ?? 'Approved';
+                    unset($_SESSION['booking_new_status']);
+                    if ($newStatus === 'Approved'): ?>
+                        <p style="color:#198754; font-size:0.9rem; margin-top:8px;">Your booking has been <strong>automatically approved</strong>.</p>
+                    <?php else: ?>
+                        <p style="color:#f59e0b; font-size:0.9rem; margin-top:8px;"> Storage is currently at high capacity. Your booking is <strong>pending staff approval</strong>.</p>
+                    <?php endif; ?>
                 <?php else: ?>
-                    <p>Booking saved successfully! You can process payment or cancel it anytime on your dashboard.</p>
+                    <p>Booking saved! You can pay or cancel anytime from your dashboard.</p>
                 <?php endif; ?>
                 <button type="button" id="home" onclick="window.location.href='mainStatus.php'">
                     Go back home
