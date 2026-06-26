@@ -489,7 +489,7 @@ $conn->close();
         <div id="payPopup" class="popupOverlay <?php echo ($paymentSuccess || $payLaterSuccess) ? 'show' : ''; ?>">
             <div class="popupBox">
                 <?php if ($paymentSuccess): ?>
-                    <p>✓ Payment of <strong>RM <?php echo number_format((float)$amount, 2); ?></strong> successful!</p>
+                    <p>Payment of <strong>RM <?php echo number_format((float)$amount, 2); ?></strong> successful!</p>
                     <?php
                     $newStatus = $_SESSION['booking_new_status'] ?? 'Approved';
                     unset($_SESSION['booking_new_status']);

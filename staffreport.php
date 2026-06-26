@@ -15,6 +15,9 @@ if ($conn->connect_error) die("Connection Failed: " . $conn->connect_error);
 
 $staff_name = $_SESSION['Staff_Name'] ?? 'Staff';
 
+// Penalty rate defined here to match staffpenalty.php
+$PENALTY_RATE = 2.00;
+
 // ── Filters ───────────────────────────────────────────────────────────────────
 $filterStatus = $_GET['status'] ?? 'all';
 $filterDate   = $_GET['date']   ?? 'all';   // this_month, last_month, all
@@ -44,7 +47,12 @@ $whereSQL = implode(" AND ", $where);
 $totalBookings  = $conn->query("SELECT COUNT(*) AS c FROM booking")->fetch_assoc()['c'];
 $totalRevenue   = $conn->query("SELECT COALESCE(SUM(Amount),0) AS r FROM payment WHERE LOWER(Payment_Status) IN ('y','paid')")->fetch_assoc()['r'];
 $totalItems     = $conn->query("SELECT COALESCE(SUM(Quantity),0) AS c FROM item")->fetch_assoc()['c'];
-$overdueCount   = $conn->query("SELECT COUNT(*) AS c FROM booking WHERE LOWER(Booking_Status)='approved' AND Pickup_Date < CURDATE()")->fetch_assoc()['c'];
+
+// Overdue bookings penalty snapshot matching the rule from staffpenalty.php
+$overdueRes     = $conn->query("SELECT COUNT(*) AS c, COALESCE(SUM(DATEDIFF(CURDATE(), Pickup_Date)), 0) AS total_days FROM booking WHERE LOWER(Booking_Status)='approved' AND Pickup_Date < CURDATE()");
+$overdueRow     = $overdueRes->fetch_assoc();
+$overdueCount   = $overdueRow['c'];
+$accumulatedPenalties = round($overdueRow['total_days'] * $PENALTY_RATE, 2);
 
 // ── Booking status breakdown ──────────────────────────────────────────────────
 $statusBreakdown = [];
@@ -62,6 +70,7 @@ $reportData = $conn->query("
         s.Student_Name,
         s.Student_ID,
         rc.Residential_Block,
+        DATEDIFF(CURDATE(), b.Pickup_Date) AS DaysOverdue,
         COALESCE(SUM(i.Quantity), 0)           AS TotalItem,
         COALESCE(SUM(i.Quantity * i.Price), 0) AS TotalFee,
         p.Payment_Status,
@@ -84,6 +93,20 @@ $storageUsed  = $conn->query("SELECT COALESCE(SUM(i.Quantity),0) AS u FROM item 
 $storageTotal = 500;
 $storagePct   = min(100, round(($storageUsed / $storageTotal) * 100));
 
+// Calculated filter totals for footer block before connection close
+$tRes = $conn->query("
+    SELECT 
+        COALESCE(SUM(i.Quantity * i.Price), 0) AS tf,
+        COALESCE(SUM(CASE WHEN LOWER(b.Booking_Status)='approved' AND b.Pickup_Date < CURDATE() THEN DATEDIFF(CURDATE(), b.Pickup_Date) ELSE 0 END), 0) AS total_overdue_days
+    FROM booking b
+    LEFT JOIN item i ON b.Booking_ID = i.Booking_ID
+    LEFT JOIN student s ON b.Student_ID = s.Student_ID
+    WHERE $whereSQL
+");
+$footerTotals = $tRes->fetch_assoc();
+$filteredTotalFee = $footerTotals['tf'];
+$filteredPenaltyEst = round($footerTotals['total_overdue_days'] * $PENALTY_RATE, 2);
+
 $conn->close();
 ?>
 <!DOCTYPE html>
@@ -91,7 +114,7 @@ $conn->close();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VaulteM – Reports</title>
+    <title>VaulteM – Reports & Penalties</title>
     <link rel="stylesheet" href="status.css">
     <link rel="stylesheet" href="mobile.css">
     <style>
@@ -128,6 +151,8 @@ $conn->close();
         .sum-label { font-size: 0.7rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
         .sum-value { font-size: 1.8rem; font-weight: 800; line-height: 1; color: #1e1b4b; }
         .sum-sub   { font-size: 0.72rem; color: #888; margin-top: 4px; }
+        .sum-link { display: block; font-size: 0.72rem; color: #ef4444; margin-top: 4px; font-weight: bold; text-decoration: none; }
+        .sum-link:hover { text-decoration: underline; }
 
         /* ── Storage bar ── */
         .storage-card {
@@ -145,6 +170,13 @@ $conn->close();
         .storage-info { display: flex; justify-content: space-between; font-size: 0.78rem; color: #888; }
 
         /* ── Status breakdown ── */
+        .breakdown-card {
+            background: #f1f0ea;
+            color: #1e1b4b;
+            border-radius: 16px;
+            padding: 18px 20px;
+        }
+        .breakdown-card h4 { font-size: 0.78rem; text-transform: uppercase; color: #888; letter-spacing: 0.5px; margin-bottom: 14px; }
         .breakdown-row {
             display: flex;
             align-items: center;
@@ -277,6 +309,7 @@ $conn->close();
         .badge-unpaid    { background: #f8d7da; color: #721c24; }
         .badge-later     { background: #fff3cd; color: #856404; }
         .prio-badge      { background: #dc3545; color: #fff; font-size: 0.65rem; padding: 1px 6px; border-radius: 8px; font-weight: 700; }
+        .overdue-text    { color: #dc3545; font-weight: bold; font-size: 0.75rem; display: block; }
 
         .bid-link { color: #7c5cfc; font-weight: 700; text-decoration: none; }
         .bid-link:hover { text-decoration: underline; }
@@ -288,15 +321,7 @@ $conn->close();
             gap: 16px;
             margin-bottom: 26px;
         }
-        .breakdown-card {
-            background: #f1f0ea;
-            color: #1e1b4b;
-            border-radius: 16px;
-            padding: 18px 20px;
-        }
-        .breakdown-card h4 { font-size: 0.78rem; text-transform: uppercase; color: #888; letter-spacing: 0.5px; margin-bottom: 14px; }
 
-        /* Profile menu */
         #profileContainer { position: relative; display: inline-block; cursor: pointer; }
         #userImage { vertical-align: middle; margin-left: 5px; }
         #profileSelect { display: none; position: absolute; right: 0; top: 25px; background-color: #241253; border: 1px solid #E8E9DE; border-radius: 8px; min-width: 130px; z-index: 10; }
@@ -314,17 +339,15 @@ $conn->close();
 <div id="wrapper">
     <button class="back" onclick="history.back()">&#60; Back</button>
 
-    <!-- Left sidebar -->
     <div class="leftcontainer">
         <header>
             <h1 onclick="window.location.href='staffMainStatus.php'" style="cursor:pointer;">VaulteM</h1>
         </header>
-        <button type="button" id="booking" onclick="window.location.href='Staffmainstatus.php'">
+        <button type="button" id="booking" onclick="window.location.href='staffMainStatus.php'">
             Dashboard
         </button>
     </div>
 
-    <!-- Right content -->
     <div class="rightcontainer">
 
         <div id="userName">
@@ -339,9 +362,8 @@ $conn->close();
             </span>
         </div>
 
-        <h1>Reports</h1>
+        <h1>Reports & Penalties</h1>
 
-        <!-- ── Summary stat cards ── -->
         <div class="summary-grid">
             <div class="sum-card purple">
                 <div class="sum-label">Total Bookings</div>
@@ -359,16 +381,14 @@ $conn->close();
                 <div class="sum-sub">Across all bookings</div>
             </div>
             <div class="sum-card red">
-                <div class="sum-label">Overdue</div>
+                <div class="sum-label">Overdue Bookings</div>
                 <div class="sum-value"><?php echo $overdueCount; ?></div>
-                <div class="sum-sub">Past pick-up date</div>
+                <a href="staffpenalty.php" class="sum-link">Manage RM <?php echo number_format($accumulatedPenalties, 2); ?></a>
             </div>
         </div>
 
-        <!-- ── Storage + Breakdown row ── -->
         <div class="summary-top">
 
-            <!-- Storage capacity -->
             <div class="storage-card">
                 <h4>Storage Capacity</h4>
                 <div class="storage-bar-wrap">
@@ -386,7 +406,6 @@ $conn->close();
                 <?php endif; ?>
             </div>
 
-            <!-- Status breakdown -->
             <div class="breakdown-card">
                 <h4>Booking Status Breakdown</h4>
                 <?php
@@ -410,12 +429,10 @@ $conn->close();
             </div>
         </div>
 
-        <!-- ── Filters + Export ── -->
         <div class="section-label">Booking Records</div>
 
         <form method="GET" style="margin-bottom:0;">
             <div class="filter-bar">
-                <!-- Status filters -->
                 <?php
                 $statuses = ['all' => 'All', 'pending' => 'Pending', 'approved' => 'Approved', 'rejected' => 'Rejected', 'collected' => 'Collected'];
                 foreach ($statuses as $sv => $sl):
@@ -428,7 +445,6 @@ $conn->close();
 
                 <span style="color:#8b82b5; font-size:0.75rem; padding: 0 4px;">|</span>
 
-                <!-- Date filters -->
                 <?php
                 $dates = ['all' => 'All Time', 'this_month' => 'This Month', 'last_month' => 'Last Month'];
                 foreach ($dates as $dv => $dl):
@@ -440,7 +456,6 @@ $conn->close();
                 <?php endforeach; ?>
             </div>
 
-            <!-- Search + export row -->
             <div style="display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap;">
                 <input class="search-input" type="text" name="q" placeholder="Search by student name, ID, or booking ID…"
                        value="<?php echo htmlspecialchars($search); ?>">
@@ -455,7 +470,6 @@ $conn->close();
             </div>
         </form>
 
-        <!-- ── Report table ── -->
         <div class="table-wrap">
             <table class="report-table" id="reportTable">
                 <thead>
@@ -469,7 +483,7 @@ $conn->close();
                         <th>Drop-off</th>
                         <th>Pick-up</th>
                         <th>Items</th>
-                        <th>Total Fee (RM)</th>
+                        <th>Storage Fee (RM)</th>
                         <th>Payment</th>
                         <th>Method</th>
                         <th>Paid (RM)</th>
@@ -494,13 +508,21 @@ $conn->close();
 
                         $pBadge = $isPaid ? 'badge-paid' : ($isLater ? 'badge-later' : 'badge-unpaid');
                         $pLabel = $isPaid ? 'Paid' : ($isLater ? 'Pay Later' : 'Unpaid');
+
+                        $daysOverdue = max(0, (int)$row['DaysOverdue']);
+                        $isOverdueNow = ($bs === 'approved' && $daysOverdue > 0);
                 ?>
                 <tr>
                     <td><a href="staffBookingDetail.php?id=<?php echo $row['Booking_ID']; ?>" class="bid-link">#<?php echo $row['Booking_ID']; ?></a></td>
                     <td><?php echo htmlspecialchars($row['Student_Name']); ?></td>
                     <td><?php echo htmlspecialchars($row['Student_ID']); ?></td>
                     <td><?php echo htmlspecialchars($row['Residential_Block'] ?? 'N/A'); ?></td>
-                    <td><span class="badge <?php echo $bBadge; ?>"><?php echo htmlspecialchars($row['Booking_Status']); ?></span></td>
+                    <td>
+                        <span class="badge <?php echo $bBadge; ?>"><?php echo htmlspecialchars($row['Booking_Status']); ?></span>
+                        <?php if ($isOverdueNow): ?>
+                            <span class="overdue-text"><?php echo $daysOverdue; ?>d Overdue</span>
+                        <?php endif; ?>
+                    </td>
                     <td><?php echo $row['Booking_Priority'] === 'Y' ? '<span class="prio-badge">EMERGENCY</span>' : 'Normal'; ?></td>
                     <td><?php echo htmlspecialchars($row['DropOff_Date']); ?></td>
                     <td><?php echo htmlspecialchars($row['Pickup_Date']); ?></td>
@@ -521,33 +543,18 @@ $conn->close();
                         <td colspan="8" style="padding:10px 14px; color:#555;">Total (<?php echo $rowCount; ?> records)</td>
                         <td style="padding:10px 14px; color:#1e1b4b;">—</td>
                         <td style="padding:10px 14px; color:#1e1b4b;">
-                            <?php
-                            // Re-query totals based on current filter
-                            $totConn = new mysqli("localhost","root","","utem_accommodation");
-                            $tRes = $totConn->query("
-                                SELECT COALESCE(SUM(i.Quantity * i.Price),0) AS tf
-                                FROM booking b
-                                LEFT JOIN item i ON b.Booking_ID = i.Booking_ID
-                                LEFT JOIN student s ON b.Student_ID = s.Student_ID
-                                WHERE $whereSQL
-                            ");
-                            $tf = $tRes ? $tRes->fetch_assoc()['tf'] : 0;
-                            $totConn->close();
-                            echo number_format((float)$tf, 2);
-                            ?>
+                            RM <?php echo number_format((float)$filteredTotalFee, 2); ?>
                         </td>
-                        <td colspan="3" style="padding:10px 14px;"></td>
+                        <td colspan="3" style="padding:10px 14px; text-align: right; color: #dc3545;">
+                            Est. Filtered Penalty: RM <?php echo number_format($filteredPenaltyEst, 2); ?>
+                        </td>
                     </tr>
                 </tfoot>
                 <?php endif; ?>
             </table>
         </div>
 
-    </div><!-- /rightcontainer -->
-</div><!-- /wrapper -->
-
-<!-- Logout popup -->
-<div id="logoutPopup" class="hidden">
+    </div></div><div id="logoutPopup" class="hidden">
     <div id="logoutText">
         <p>Are you sure you want to logout?</p>
         <div id="logoutButton">
@@ -557,7 +564,6 @@ $conn->close();
     </div>
 </div>
 
-<!-- Profile popup -->
 <div id="profilePopup" class="hidden">
     <div id="profileShortDetails">
         <h3>Profile</h3>
@@ -584,7 +590,6 @@ $conn->close();
         for (let row of table.rows) {
             const cols = [];
             for (let cell of row.cells) {
-                // Strip HTML tags from cell content
                 const tmp = document.createElement('div');
                 tmp.innerHTML = cell.innerHTML;
                 cols.push('"' + (tmp.textContent || tmp.innerText || '').replace(/"/g, '""').trim() + '"');
