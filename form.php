@@ -88,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ($otherQty    * 5.00);
 
     if ($bookingPriority === 'Y') {
-        $totalPrice += 10.00;
+        $totalPrice += 5.00;
     }
 
     $studentIdEsc       = mysqli_real_escape_string($conn, $student_id);
@@ -726,7 +726,7 @@ mysqli_close($conn);
                         <input type="checkbox" id="emergencyCheckbox" onchange="calculateTotal(); checkItemLimit()">
                         <span>Emergency</span>
                     </label>
-                    <span class="emergencyNote">(+ RM10 for Emergency Booking)</span>
+                    <span class="emergencyNote">(+ RM5 for Emergency Booking)</span>
                 </div>
                 <button type="button" id="backBtn" onclick="window.location.href='mainStatus.php'">Cancel</button>
                 <button type="submit" class="submitBtn">Submit</button>
@@ -973,7 +973,7 @@ mysqli_close($conn);
                 (parseInt(document.getElementById('otherQty').value)    || 0) * 5;
 
             if (document.getElementById('emergencyCheckbox').checked) {
-                basePrice += 10;
+                basePrice += 5;
             }
 
             document.getElementById('totalPrice').textContent = basePrice.toFixed(2);
