@@ -126,3 +126,27 @@ p{
     transform: translateY(-1px);
 }
 
+.password-box{
+    position: relative;
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+.password-box input{
+    margin-bottom: 0;      /* buang margin asal */
+    padding-right: 50px;   /* ruang untuk icon */
+}
+
+.password-box i{
+    position: absolute;
+    right: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: #555;
+    font-size: 18px;
+}
+
+.password-box i:hover{
+    color: #000;
+}
