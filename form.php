@@ -88,7 +88,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ($otherQty    * 5.00);
 
     if ($bookingPriority === 'Y') {
-        $totalPrice += 5.00;
+        $totalPrice += 10.00;
     }
 
     $studentIdEsc       = mysqli_real_escape_string($conn, $student_id);
@@ -629,15 +629,15 @@ mysqli_close($conn);
                         <div class="bagDropdown" id="bagDropdown">
                             <div class="bagOption">
                                 <span>Big Bag <span class="itemPrice">RM 7.00</span></span>
-                                <input type="number" id="bigBagQty" name="bigBagQty" value="0" min="0" oninput="calculateTotal(); checkItemLimit()">
+                                <input type="number" id="bigBagQty" name="bigBagQty" value="0" min="0" max="3" max="3" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                             <div class="bagOption">
                                 <span>Medium Bag <span class="itemPrice">RM 5.00</span></span>
-                                <input type="number" id="medBagQty" name="medBagQty" value="0" min="0" oninput="calculateTotal(); checkItemLimit()">
+                                <input type="number" id="medBagQty" name="medBagQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                             <div class="bagOption">
                                 <span>Small Bag <span class="itemPrice">RM 3.00</span></span>
-                                <input type="number" id="smallBagQty" name="smallBagQty" value="0" min="0" oninput="calculateTotal(); checkItemLimit()">
+                                <input type="number" id="smallBagQty" name="smallBagQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                         </div>
                     </div>
@@ -652,15 +652,15 @@ mysqli_close($conn);
                         <div class="bagDropdown" id="luggageDropdown">
                             <div class="bagOption">
                                 <span>Large Luggage <span class="itemPrice">RM 10.00</span></span>
-                                <input type="number" id="largeLugQty" name="largeLugQty" value="0" min="0" oninput="calculateTotal(); checkItemLimit()">
+                                <input type="number" id="largeLugQty" name="largeLugQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                             <div class="bagOption">
                                 <span>Medium Luggage <span class="itemPrice">RM 8.00</span></span>
-                                <input type="number" id="medLugQty" name="medLugQty" value="0" min="0" oninput="calculateTotal(); checkItemLimit()">
+                                <input type="number" id="medLugQty" name="medLugQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                             <div class="bagOption">
                                 <span>Small Luggage <span class="itemPrice">RM 6.00</span></span>
-                                <input type="number" id="smallLugQty" name="smallLugQty" value="0" min="0" oninput="calculateTotal(); checkItemLimit()">
+                                <input type="number" id="smallLugQty" name="smallLugQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                         </div>
                     </div>
@@ -675,15 +675,15 @@ mysqli_close($conn);
                         <div class="bagDropdown" id="boxDropdown">
                             <div class="bagOption">
                                 <span>Big Box <span class="itemPrice">RM 5.00</span></span>
-                                <input type="number" id="bigBoxQty" name="bigBoxQty" value="0" min="0" oninput="calculateTotal(); checkItemLimit()">
+                                <input type="number" id="bigBoxQty" name="bigBoxQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                             <div class="bagOption">
                                 <span>Medium Box <span class="itemPrice">RM 3.00</span></span>
-                                <input type="number" id="medBoxQty" name="medBoxQty" value="0" min="0" oninput="calculateTotal(); checkItemLimit()">
+                                <input type="number" id="medBoxQty" name="medBoxQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                             <div class="bagOption">
                                 <span>Small Box <span class="itemPrice">RM 2.00</span></span>
-                                <input type="number" id="smallBoxQty" name="smallBoxQty" value="0" min="0" oninput="calculateTotal(); checkItemLimit()">
+                                <input type="number" id="smallBoxQty" name="smallBoxQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                         </div>
                     </div>
@@ -696,7 +696,7 @@ mysqli_close($conn);
                         <span>Bucket/Pail</span>
                         <span class="itemPrice">RM 3.00 / item</span>
                     </div>
-                    <input id="bucketInput" type="number" name="bucketQty" min="0" value="0" oninput="calculateTotal(); checkItemLimit()">
+                    <input id="bucketInput" type="number" name="bucketQty" min="0" max="3" value="0" oninput="calculateTotal(); checkItemLimit()">
                 </div>
 
                 <!-- Others -->
@@ -705,7 +705,7 @@ mysqli_close($conn);
                         <span>Others</span>
                         <span class="itemPrice">RM 5.00 / item</span>
                     </div>
-                    <input id="otherQty" type="number" name="otherQty" min="0" value="0" oninput="calculateTotal(); checkItemLimit()">
+                    <input id="otherQty" type="number" name="otherQty" min="0" max="3" value="0" oninput="calculateTotal(); checkItemLimit()">
                 </div>
 
                 <input type="hidden" id="dropOffDate" name="dropOffDate" value="">
@@ -726,7 +726,7 @@ mysqli_close($conn);
                         <input type="checkbox" id="emergencyCheckbox" onchange="calculateTotal(); checkItemLimit()">
                         <span>Emergency</span>
                     </label>
-                    <span class="emergencyNote">(+ RM5 for Emergency Booking)</span>
+                    <span class="emergencyNote">(+ RM10 for Emergency Booking)</span>
                 </div>
                 <button type="button" id="backBtn" onclick="window.location.href='mainStatus.php'">Cancel</button>
                 <button type="submit" class="submitBtn">Submit</button>
@@ -793,6 +793,13 @@ mysqli_close($conn);
             });
 
             const limitReached = totalItems >= 3;
+            // Clamp any input that pushes total over 3
+            qtyInputs.forEach(id => {
+                const el = document.getElementById(id);
+                const val = parseInt(el.value) || 0;
+                const others = qtyInputs.reduce((s, oid) => s + (oid !== id ? (parseInt(document.getElementById(oid).value) || 0) : 0), 0);
+                if (others + val > 3) { el.value = Math.max(0, 3 - others); }
+            });
             const reminder = document.getElementById('itemLimitReminder');
 
             reminder.style.color = limitReached ? '#c0392b' : '#e74c3c';
@@ -973,7 +980,7 @@ mysqli_close($conn);
                 (parseInt(document.getElementById('otherQty').value)    || 0) * 5;
 
             if (document.getElementById('emergencyCheckbox').checked) {
-                basePrice += 5;
+                basePrice += 10;
             }
 
             document.getElementById('totalPrice').textContent = basePrice.toFixed(2);
