@@ -199,8 +199,8 @@ $conn->close();
             <div class="summary-info">
                 <p>Student   : <?php echo htmlspecialchars($row['Student_Name']); ?></p>
                 <p>College   : <?php echo htmlspecialchars($row['Residential_Block'] ?? 'N/A'); ?></p>
-                <p>Drop-off  : <?php echo htmlspecialchars($row['DropOff_Date']); ?></p>
-                <p>Pick-up   : <?php echo htmlspecialchars($row['Pickup_Date']); ?></p>
+                <p>Drop-off  : <?php echo date('d/m/Y', strtotime($row['DropOff_Date'])); ?></p>
+                <p>Pick-up   : <?php echo date('d/m/Y', strtotime($row['Pickup_Date'])); ?></p>
                 <p>Items     : <?php echo $row['TotalItem']; ?></p>
                 <p>Total fee : RM <?php echo number_format((float)$row['TotalFee'], 2); ?></p>
             </div>
