@@ -27,7 +27,6 @@ if ($genderQuery && mysqli_num_rows($genderQuery) > 0) {
     die("No student record found. Please log in again.");
 }
 
-// Updated Query: Set unit space capacity value to 150
 $collegeQuery = "
     SELECT rc.Residential_ID,
            rc.Residential_Block,
@@ -99,7 +98,6 @@ if ($bookingPriority === 'Y') {
     $dropOffDateEsc = mysqli_real_escape_string($conn, $dropOffDate);
     $pickupDateEsc = mysqli_real_escape_string($conn, $pickupDate);
 
-    // Grab the ID integer directly from the selected card form submission
     $residential_id = (int)($_POST['residentialCollege'] ?? 0);
 
     if ($residential_id <= 0) {
@@ -122,7 +120,6 @@ if ($bookingPriority === 'Y') {
     }
     $booking_id = mysqli_insert_id($conn);
 
-    // Deduct booked items from storespace
     $deductSpace = mysqli_prepare($conn, "UPDATE storespace SET Size = Size - ? WHERE Space_ID = ?");
     mysqli_stmt_bind_param($deductSpace, "ii", $totalItems, $space_id);
     mysqli_stmt_execute($deductSpace);
@@ -354,14 +351,12 @@ mysqli_close($conn);
             width: 65%;
         }
 
-        /* ── NEW: price tag shown beside / below each item label ── */
         .itemPrice {
             font-size: 1rem;
             color: #7a6e93;
             font-weight: normal;
         }
         
-        /* price inside dark dropdown panels */
         .bagOption .itemPrice {
             color: #c9c3d8;
             font-size: 0.74rem;
@@ -626,7 +621,6 @@ mysqli_close($conn);
                      Maximum 3 items per booking.
                 </p>
 
-                <!-- BAG -->
                 <div class="itemRow">
                     <div class="itemLeft">
                         <span>Bag</span>
@@ -649,7 +643,6 @@ mysqli_close($conn);
                     <button type="button" class="chooseBtn" data-target="bagDropdown">Choose &#9660;</button>
                 </div>
 
-                <!-- LUGGAGE -->
                 <div class="itemRow">
                     <div class="itemLeft">
                         <span>Luggage</span>
@@ -672,7 +665,6 @@ mysqli_close($conn);
                     <button type="button" class="chooseBtn" data-target="luggageDropdown">Choose &#9660;</button>
                 </div>
 
-                <!-- BOX -->
                 <div class="itemRow">
                     <div class="itemLeft">
                         <span>Box</span>
@@ -695,7 +687,6 @@ mysqli_close($conn);
                     <button type="button" class="chooseBtn" data-target="boxDropdown">Choose &#9660;</button>
                 </div>
 
-                <!-- BUCKET/PAIL -->
                 <div class="itemRow">
                     <div class="itemLeft">
                         <span>Bucket/Pail</span>
@@ -704,7 +695,6 @@ mysqli_close($conn);
                     <input id="bucketInput" type="number" name="bucketQty" min="0" value="0" oninput="calculateTotal(); checkItemLimit()">
                 </div>
 
-                <!-- OTHERS -->
                 <div class="itemRow">
                     <div class="itemLeft">
                         <span>Others</span>
@@ -736,7 +726,6 @@ mysqli_close($conn);
                     <span class ="emergencyNote">(+ RM5 for Emergency Booking)</span>
                 </div>
                 <button type="button" id="backBtn" onclick="window.location.href='mainStatus.php'">Cancel</button>
-                <!-- button to go back home or to cancel booking -->
                 <button type="submit" class="submitBtn">Submit</button>
             </div>
         </div>
@@ -808,7 +797,6 @@ mysqli_close($conn);
                 ? '* Limit reached! Reduce items to add more.'
                 : '* Maximum 3 items per booking.';
 
-            // Disable/enable Choose buttons
             document.querySelectorAll('.chooseBtn').forEach(btn => {
                 if (limitReached) {
                     btn.disabled = true;
