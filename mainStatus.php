@@ -31,7 +31,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_booking_id']))
     $verifyResult = $verifyStmt->get_result();
 
     if ($verifyResult->num_rows > 0) {
-        // Get total items + space being cancelled
+
         $getItems = $conn->prepare("SELECT SUM(Quantity) AS total, Space_ID FROM item WHERE Booking_ID = ? GROUP BY Space_ID");
         $getItems->bind_param("i", $cancelID);
         $getItems->execute();
