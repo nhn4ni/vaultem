@@ -451,7 +451,7 @@ $conn->close();
                 <a href="?status=<?php echo $filterStatus; ?>&date=<?php echo $filterDate; ?>"
                    style="color:#8b82b5; font-size:0.82rem; line-height:2.4;">✕ Clear</a>
                 <?php endif; ?>
-                <button type="button" class="export-btn" onclick="exportCSV()">⬇ Export CSV</button>
+                <button type="button" class="export-btn" onclick="exportCSV()">Export CSV</button>
             </div>
         </form>
 
