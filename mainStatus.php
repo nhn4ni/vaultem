@@ -203,8 +203,12 @@ $result = $conn->query($sql);
             .header-actions { width: 100%; justify-content: space-between; }
             .pay-btn        { margin-left: 0; }
         }
-
-      
+          .pickup-note {
+        margin-top: 5px;
+        font-size: 0.85rem;
+        color: #dc3545;
+        font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -300,15 +304,18 @@ $result = $conn->query($sql);
             </div>
 
             <div class="summary-info">
-                <p>Drop-off date : <?php echo date("d-m-Y", strtotime($row['DropOff_Date'])); ?></p>
-                <p>Pick-up date  : <?php echo date("d-m-Y", strtotime($row['Pickup_Date'])); ?></p>                <p>Item quantity : <?php echo htmlspecialchars($row['TotalItem'] ?? '0'); ?></p>
+                <p>Drop-off date : <?php echo htmlspecialchars($row['DropOff_Date']); ?></p>
+                <p>Pick-up date  : <?php echo htmlspecialchars($row['Pickup_Date']); ?></p>
+                <p>Item quantity : <?php echo htmlspecialchars($row['TotalItem'] ?? '0'); ?></p>
                 <p>College       : <?php echo htmlspecialchars($row['Residential_Block'] ?? 'N/A'); ?></p>
                 <p>Total fee     : RM <?php echo number_format((float)($row['TotalFee'] ?? 0), 2); ?></p>
                 <?php if ($paymentRow): ?>
                     <p>Payment status: <?php echo $isPaid ? 'Paid' : (($paymentStatus === 'P' || strtolower($paymentStatus) === 'pending') ? 'Pending Payment (Pay Later)' : 'Unpaid'); ?></p>
                 <?php endif; ?>
 
-                
+                <p class="pickup-note">
+                Note: Pickup time is 8:00 AM - 11:00 PM only
+</p>
             </div>
 
             <div class="button-container">
