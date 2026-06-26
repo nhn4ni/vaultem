@@ -382,7 +382,7 @@ $conn->close();
 <body>
 
     <div id="wrapper">
-        <button class="back" onclick="window.location.href='mainStatus.php'"> &#60; Back</button>
+        
     </div>
 
     <div id="body2">
