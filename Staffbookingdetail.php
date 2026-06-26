@@ -14,25 +14,64 @@ $bid = intval($_GET['id'] ?? 0);
 
 if (!$bid) { header("Location: staffMainStatus.php"); exit(); }
 
+// ── Storage capacity based on storespace table ────────────────────────────────
+// Get the student's residential college for this booking
+$collegeRes = $conn->query("
+    SELECT s.Residential_ID,
+           COALESCE(SUM(ss.Size), 0) AS TotalCapacity
+    FROM booking b
+    JOIN student s ON b.Student_ID = s.Student_ID
+    JOIN storespace ss ON ss.Residential_ID = s.Residential_ID
+    WHERE b.Booking_ID = $bid
+    GROUP BY s.Residential_ID
+");
+$storageTotal = 0;
+$residentialID = null;
+if ($collegeRes && $collegeRes->num_rows > 0) {
+    $cr = $collegeRes->fetch_assoc();
+    $storageTotal  = (int)$cr['TotalCapacity'];
+    $residentialID = $cr['Residential_ID'];
+}
+
+// Items currently stored (approved bookings) in the same residential college
+$storageUsed = 0;
+if ($residentialID) {
+    $usedRes = $conn->query("
+        SELECT COALESCE(SUM(i.Quantity), 0) AS used
+        FROM item i
+        JOIN booking b  ON i.Booking_ID  = b.Booking_ID
+        JOIN student s  ON b.Student_ID  = s.Student_ID
+        WHERE LOWER(b.Booking_Status) = 'approved'
+          AND s.Residential_ID = '$residentialID'
+    ");
+    if ($usedRes) $storageUsed = (int)$usedRes->fetch_assoc()['used'];
+}
+
+$storagePct          = ($storageTotal > 0) ? round(($storageUsed / $storageTotal) * 100) : 0;
+$needsManualApproval = ($storagePct >= 60);
+
 // ── Handle POST ───────────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['approve'])) {
-        $stmt = $conn->prepare("UPDATE booking SET Booking_Status = 'Approved' WHERE Booking_ID = ?");
+    // Approve — only allowed when storage >= 60% (manual mode)
+    if (isset($_POST['approve']) && $needsManualApproval) {
+        $stmt = $conn->prepare("UPDATE booking SET Booking_Status = 'Approved' WHERE Booking_ID = ? AND LOWER(Booking_Status) = 'pending'");
         $stmt->bind_param("i", $bid); $stmt->execute(); $stmt->close();
         header("Location: staffBookingDetail.php?id=$bid&msg=approved"); exit();
     }
-    if (isset($_POST['reject'])) {
+    // Reject — only allowed when storage >= 60% (manual mode)
+    if (isset($_POST['reject']) && $needsManualApproval) {
         $reason = trim($_POST['reject_reason'] ?? '');
-        $stmt = $conn->prepare("UPDATE booking SET Booking_Status = 'Rejected' WHERE Booking_ID = ?");
+        $stmt = $conn->prepare("UPDATE booking SET Booking_Status = 'Rejected' WHERE Booking_ID = ? AND LOWER(Booking_Status) = 'pending'");
         $stmt->bind_param("i", $bid); $stmt->execute(); $stmt->close();
         header("Location: staffBookingDetail.php?id=$bid&msg=rejected"); exit();
     }
+    // Verify (send to student)
     if (isset($_POST['verify'])) {
         $stmt = $conn->prepare("UPDATE booking SET Booking_Status = 'Verification_Sent' WHERE Booking_ID = ? AND LOWER(Booking_Status) = 'approved'");
         $stmt->bind_param("i", $bid); $stmt->execute(); $stmt->close();
         header("Location: staffBookingDetail.php?id=$bid&msg=verified"); exit();
     }
-    // ── Handle drop-off photo upload ─────────────────────────────────────────
+    // Drop-off photo upload
     if (isset($_POST['upload_dropoff'])) {
         if (isset($_FILES['dropoff_photo']) && $_FILES['dropoff_photo']['error'] === 0) {
             $ext     = strtolower(pathinfo($_FILES['dropoff_photo']['name'], PATHINFO_EXTENSION));
@@ -268,13 +307,12 @@ $conn->close();
 </head>
 <body>
 <div id="wrapper">
-    <button class="back" onclick="history.back()">&#60; Back</button>
 
     <div class="leftcontainer">
         <header>
             <h1 onclick="window.location.href='staffMainStatus.php'" style="cursor:pointer;">VaulteM</h1>
         </header>
-        <button type="button" id="booking" onclick="window.location.href='staffMain.php'">
+        <button type="button" id="booking" onclick="window.location.href='Staffmainstatus.php'">
             Manage Bookings
         </button>
     </div>
@@ -300,10 +338,10 @@ $conn->close();
         <div class="msg-banner <?php echo in_array($_GET['msg'], ['approved','verified','uploaded']) ? 'msg-success' : 'msg-info'; ?>">
             <?php
                 $msgs = [
-                    'approved' => '✓ Booking approved.',
-                    'rejected' => '✓ Booking rejected.',
-                    'verified' => '✓ Verification request sent to student.',
-                    'uploaded' => '✓ Drop-off photo uploaded successfully.',
+                    'approved' => ' Booking approved.',
+                    'rejected' => ' Booking rejected.',
+                    'verified' => ' Verification request sent to student.',
+                    'uploaded' => ' Drop-off photo uploaded successfully.',
                 ];
                 echo $msgs[$_GET['msg']] ?? '';
             ?>
@@ -401,7 +439,7 @@ $conn->close();
                     <span class="field-value">
                         <?php
                             $ps = strtolower($b['Payment_Status'] ?? '');
-                            echo $isPaid ? '✓ Paid' : (($ps === 'p' || $ps === 'pending') ? 'Pay Later' : 'Unpaid');
+                            echo $isPaid ? ' Paid' : (($ps === 'p' || $ps === 'pending') ? 'Pay Later' : 'Unpaid');
                         ?>
                     </span>
                 </div>
@@ -433,7 +471,7 @@ $conn->close();
                         <h5>Drop off</h5>
                         <p>Staff must upload student's items photo as proof.</p>
                         <?php if ($uploadedPhoto): ?>
-                            <p style="color:#22c55e; font-size:0.78rem; margin-top:6px; font-weight:600;">✓ Photo uploaded</p>
+                            <p style="color:#22c55e; font-size:0.78rem; margin-top:6px; font-weight:600;"> Photo uploaded</p>
                         <?php endif; ?>
                     </div>
                     <div class="verif-right">
@@ -464,7 +502,7 @@ $conn->close();
                     <div class="verif-left">
                         <h5>Pickup</h5>
                         <?php if ($studentConfirmed): ?>
-                            <p style="color:#22c55e; font-weight:600;">✓ Student has confirmed collection.</p>
+                            <p style="color:#22c55e; font-weight:600;"> Student has confirmed collection.</p>
                         <?php elseif ($verifSent): ?>
                             <p style="color:#cfe2ff;"> Verification sent — awaiting student confirmation.</p>
                         <?php else: ?>
@@ -474,7 +512,7 @@ $conn->close();
                     </div>
                     <div class="verif-right">
                         <?php if ($studentConfirmed): ?>
-                            <span class="confirmed-tag">✓ Student Confirmed</span>
+                            <span class="confirmed-tag"> Student Confirmed</span>
                         <?php elseif ($verifSent): ?>
                             <span class="sent-tag"> Awaiting Student</span>
                         <?php elseif ($bstat === 'approved'): ?>
@@ -497,11 +535,24 @@ $conn->close();
 
         <!-- ── Action buttons ── -->
         <div class="action-row">
-            <?php if ($bstat === 'pending'): ?>
+            <?php if ($bstat === 'pending' && $needsManualApproval): ?>
+                <!-- Storage >= 60%: staff must manually approve or reject -->
+                <div style="width:97%; background:rgba(245,158,11,0.10); border:1px solid rgba(245,158,11,0.35); border-radius:14px; padding:14px 18px; margin-bottom:14px; font-size:0.85rem; color:#E8E9DE;">
+                     Storage is at <strong style="color:#f59e0b;"><?php echo $storagePct; ?>%</strong> capacity (≥60%).
+                    Manual approval is required for this booking.
+                </div>
                 <form method="POST" style="display:inline">
                     <button type="submit" name="approve" class="btn-approve"> Approve</button>
                 </form>
-                <button class="btn-reject" onclick="document.getElementById('rejectModal').classList.add('show')">Reject</button>
+                <button class="btn-reject" onclick="document.getElementById('rejectModal').classList.add('show')"> Reject</button>
+
+            <?php elseif ($bstat === 'pending' && !$needsManualApproval): ?>
+                <!-- Storage < 60%: auto-approved on payment, just show info -->
+                <div style="width:97%; background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.25); border-radius:14px; padding:14px 18px; font-size:0.85rem; color:#E8E9DE;">
+                    ℹ Storage is at <strong style="color:#22c55e;"><?php echo $storagePct; ?>%</strong> capacity.
+                    This booking will be <strong>auto-approved</strong> once the student pays.
+                    No action needed from staff.
+                </div>
             <?php endif; ?>
         </div>
 

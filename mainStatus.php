@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_booking_id']))
                   WHERE b.Booking_ID = ? 
                     AND b.Student_ID = ? 
                     AND LOWER(b.Booking_Status) = 'pending' 
-                    AND (p.Payment_Status IS NULL OR (LOWER(p.Payment_Status) != 'y' AND LOWER(p.Payment_Status) != 'paid'))";
+                    AND (p.Payment_Status IS NULL OR UPPER(p.Payment_Status) != 'Y')";
                     
     $verifyStmt = $conn->prepare($verifySql);
     $verifyStmt->bind_param("is", $cancelID, $student_id);
@@ -266,11 +266,13 @@ $result = $conn->query($sql);
                 $payResult    = $payStmt->get_result();
                 $paymentRow   = $payResult->fetch_assoc();
                 
-                $paymentStatus = isset($paymentRow['Payment_Status']) ? trim(strtolower($paymentRow['Payment_Status'])) : 'pending';
+                $paymentStatus = isset($paymentRow['Payment_Status']) ? trim(strtoupper($paymentRow['Payment_Status'])) : '';
                 $totalAmount   = $paymentRow['Amount'] ?? $row['TotalFee'] ?? 0;
                 $payStmt->close();
 
-                $isPaid = ($paymentStatus === 'y' || $paymentStatus === 'paid');
+                // Y = paid, N = pay later (unpaid), '' = no payment record yet
+                $isPaid     = ($paymentStatus === 'Y');
+                $isPayLater = ($paymentStatus === 'N');
                 
                 // Helper variable to handle case-insensitive checks for button rendering
                 $currentStatusLower = strtolower($bookingStatus);
@@ -294,13 +296,13 @@ $result = $conn->query($sql);
                             <?php echo htmlspecialchars($bookingStatus); ?>
                         </span>
 
-                        <?php if (($currentStatusLower === 'pending' || $currentStatusLower === 'approved') && !$isPaid): ?>
+                        <?php if ($isPaid): ?>
+                            <button class="pay-btn paid" disabled> Paid</button>
+                        <?php elseif ($currentStatusLower !== 'rejected'): ?>
                             <button class="pay-btn"
                                     onclick="redirectToPayment('<?php echo $bookingID; ?>', <?php echo (float)$totalAmount; ?>)">
                                 Pay Now
                             </button>
-                        <?php elseif ($isPaid): ?>
-                            <button class="pay-btn paid" disabled>Paid</button>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -313,7 +315,15 @@ $result = $conn->query($sql);
                 <p>College       : <?php echo htmlspecialchars($row['Residential_Block'] ?? 'N/A'); ?></p>
                 <p>Total fee     : RM <?php echo number_format((float)($row['TotalFee'] ?? 0), 2); ?></p>
                 <?php if ($paymentRow): ?>
-                    <p>Payment status: <?php echo $isPaid ? 'Paid' : (($paymentStatus === 'P' || strtolower($paymentStatus) === 'pending') ? 'Pending Payment (Pay Later)' : 'Unpaid'); ?></p>
+                    <p>Payment status:
+                        <?php
+                            if ($isPaid)         echo '<strong style="color:#198754;"> Paid</strong>';
+                            elseif ($isPayLater)  echo '<span style="color:#856404;">Unpaid (Pay Later)</span>';
+                            else                  echo '<span style="color:#856404;">Unpaid</span>';
+                        ?>
+                    </p>
+                <?php else: ?>
+                    <p>Payment status: <span style="color:#856404;">Unpaid</span></p>
                 <?php endif; ?>
 
                 <p class="pickup-note">
