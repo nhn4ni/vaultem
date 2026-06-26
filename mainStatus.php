@@ -17,7 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_booking_id']))
     $cancelID = intval($_POST['cancel_booking_id']);
     $student_id = $_SESSION['Student_ID'];
 
-    // Updated verification layout: Allows removal of both entirely unpaid or "Pay Later" records
+    // Allows removal of both entirely unpaid or "Pay Later" records
     $verifySql = "SELECT b.Booking_ID FROM booking b 
                   LEFT JOIN payment p ON b.Booking_ID = p.Booking_ID
                   WHERE b.Booking_ID = ? 
@@ -32,34 +32,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_booking_id']))
 
     if ($verifyResult->num_rows > 0) {
         // Get total items + space being cancelled
-$getItems = $conn->prepare("SELECT SUM(Quantity) AS total, Space_ID FROM item WHERE Booking_ID = ? GROUP BY Space_ID");
-$getItems->bind_param("i", $cancelID);
-$getItems->execute();
-$itemsResult = $getItems->get_result();
-if ($itemsRow = $itemsResult->fetch_assoc()) {
-    $cancelledQty = (int)$itemsRow['total'];
-    $spaceID      = (int)$itemsRow['Space_ID'];
+        $getItems = $conn->prepare("SELECT SUM(Quantity) AS total, Space_ID FROM item WHERE Booking_ID = ? GROUP BY Space_ID");
+        $getItems->bind_param("i", $cancelID);
+        $getItems->execute();
+        $itemsResult = $getItems->get_result();
+        while ($itemsRow = $itemsResult->fetch_assoc()) {
+            $cancelledQty = (int)$itemsRow['total'];
+            $spaceID      = (int)$itemsRow['Space_ID'];
 
-    // Restore units back to storespace
-    $restoreSpace = $conn->prepare("UPDATE storespace SET Size = Size + ? WHERE Space_ID = ?");
-    $restoreSpace->bind_param("ii", $cancelledQty, $spaceID);
-    $restoreSpace->execute();
-    $restoreSpace->close();
-}
-$getItems->close();
-        // 2. Delete any records inside 'payment' linked to this booking
+            // Restore units back to storespace
+            $restoreSpace = $conn->prepare("UPDATE storespace SET Size = Size + ? WHERE Space_ID = ?");
+            $restoreSpace->bind_param("ii", $cancelledQty, $spaceID);
+            $restoreSpace->execute();
+            $restoreSpace->close();
+        }
+        $getItems->close();
+
+        // Delete records inside 'payment' linked to this booking
         $deletePay = $conn->prepare("DELETE FROM payment WHERE Booking_ID = ?");
         $deletePay->bind_param("i", $cancelID);
         $deletePay->execute();
         $deletePay->close();
 
-        // 3. Delete any records inside 'item' linked to this booking
+        // Delete records inside 'item' linked to this booking
         $deleteItems = $conn->prepare("DELETE FROM item WHERE Booking_ID = ?");
         $deleteItems->bind_param("i", $cancelID);
         $deleteItems->execute();
         $deleteItems->close();
 
-        // 4. Safely delete the parent row from 'booking'
+        // Safely delete the parent row from 'booking'
         $deleteBooking = $conn->prepare("DELETE FROM booking WHERE Booking_ID = ?");
         $deleteBooking->bind_param("i", $cancelID);
         $deleteBooking->execute();
@@ -87,8 +88,8 @@ $sql = "
         b.Booking_Priority,
         s.Student_Name,
         rc.Residential_Block,
-        SUM(i.Quantity)            AS TotalItem,
-        SUM(i.Quantity * i.Price)  AS TotalFee
+        IFNULL((SELECT SUM(Quantity) FROM item WHERE Booking_ID = b.Booking_ID), 0) AS TotalItem,
+        IFNULL((SELECT SUM(Quantity * Price) FROM item WHERE Booking_ID = b.Booking_ID), 0) AS TotalFee
     FROM booking b
     LEFT JOIN student s              ON b.Student_ID     = s.Student_ID
     LEFT JOIN item i                 ON b.Booking_ID     = i.Booking_ID
@@ -109,7 +110,7 @@ $result = $conn->query($sql);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VaulteM</title>
+    <title>VaulteM - Home</title>
     <link rel="icon" type="image/x-icon" href="vaultemLogo.ico">
     <link rel="stylesheet" href="status.css">
     <link rel="stylesheet" href="mobile.css">
@@ -225,7 +226,7 @@ $result = $conn->query($sql);
                 <div id="profileSelect">
                     <button onclick="showProfile();">Profile</button>
                     <button onclick="window.location.href='settings.html'">Settings</button>
-                    <button onclick="window.location.href='studentverify.php'">Notification</button>
+                    <button onclick="window.location.href='settings.html'">Notification</button>
                     <button onclick="showLog();">Logout</button>
                 </div>
             </span>
@@ -259,15 +260,17 @@ $result = $conn->query($sql);
                 $payResult    = $payStmt->get_result();
                 $paymentRow   = $payResult->fetch_assoc();
                 
-                $paymentStatus = $paymentRow['Payment_Status'] ?? 'N';
+                $paymentStatus = isset($paymentRow['Payment_Status']) ? trim(strtolower($paymentRow['Payment_Status'])) : 'pending';
                 $totalAmount   = $paymentRow['Amount'] ?? $row['TotalFee'] ?? 0;
                 $payStmt->close();
 
-                // Normalize checks to capture both options ('Y' / 'Paid') vs ('P' / 'Pending' / 'N')
-                $isPaid = (strtolower($paymentStatus) === 'y' || strtolower($paymentStatus) === 'paid');
+                $isPaid = ($paymentStatus === 'y' || $paymentStatus === 'paid');
+                
+                // Helper variable to handle case-insensitive checks for button rendering
+                $currentStatusLower = strtolower($bookingStatus);
         ?>
         <div class="status-card">
-            <?php if (strtolower($bookingStatus) === 'pending' && !$isPaid): ?>
+            <?php if ($currentStatusLower === 'pending' && !$isPaid): ?>
                 <button class="small-cancel-btn" title="Cancel Booking" onclick="confirmCancellation(<?php echo $bookingID; ?>)">&times;</button>
             <?php endif; ?>
 
@@ -279,13 +282,13 @@ $result = $conn->query($sql);
                     <?php endif; ?>
                     <div class="header-actions">
                         <span class="status-text <?php
-                            echo strtolower($bookingStatus) === 'pending'  ? 'status-pending'  :
-                                (strtolower($bookingStatus) === 'approved' ? 'status-approved' : 'status-rejected');
+                            echo $currentStatusLower === 'pending'  ? 'status-pending'  :
+                                ($currentStatusLower === 'approved' ? 'status-approved' : 'status-rejected');
                         ?>">
                             <?php echo htmlspecialchars($bookingStatus); ?>
                         </span>
 
-                        <?php if (strtolower($bookingStatus) === 'pending' && !$isPaid): ?>
+                        <?php if (($currentStatusLower === 'pending' || $currentStatusLower === 'approved') && !$isPaid): ?>
                             <button class="pay-btn"
                                     onclick="redirectToPayment('<?php echo $bookingID; ?>', <?php echo (float)$totalAmount; ?>)">
                                 Pay Now
@@ -299,12 +302,21 @@ $result = $conn->query($sql);
 
             <div class="summary-info">
                 <p>Drop-off date : <?php echo date("d-m-Y", strtotime($row['DropOff_Date'])); ?></p>
-                <p>Pick-up date  : <?php echo date("d-m-Y", strtotime($row['Pickup_Date'])); ?></p>                <p>Item quantity : <?php echo htmlspecialchars($row['TotalItem'] ?? '0'); ?></p>
+                <p>Pick-up date  : <?php echo date("d-m-Y", strtotime($row['Pickup_Date'])); ?></p>
+                <p>Item quantity : <?php echo htmlspecialchars($row['TotalItem'] ?? '0'); ?></p>
                 <p>College       : <?php echo htmlspecialchars($row['Residential_Block'] ?? 'N/A'); ?></p>
                 <p>Total fee     : RM <?php echo number_format((float)($row['TotalFee'] ?? 0), 2); ?></p>
-                <?php if ($paymentRow): ?>
-                    <p>Payment status: <?php echo $isPaid ? 'Paid' : (($paymentStatus === 'P' || strtolower($paymentStatus) === 'pending') ? 'Pending Payment (Pay Later)' : 'Unpaid'); ?></p>
-                <?php endif; ?>
+                
+                <?php
+                if ($isPaid) {
+                    $status = "Paid";
+                } elseif ($paymentStatus === 'p' || $paymentStatus === 'pending') {
+                    $status = "Pending Payment (Pay Later)";
+                } else {
+                    $status = "Pending Payment";
+                }
+                ?>
+                <p>Payment status: <?= $status ?></p>
             </div>
 
             <div class="button-container">
@@ -406,7 +418,6 @@ $result = $conn->query($sql);
             }
         });
     });
-
 </script>
 </body>
 </html>
