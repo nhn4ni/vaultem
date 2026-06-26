@@ -369,7 +369,7 @@ $result = $conn->query($sql);
     <div id="profileShortDetails">
         <h3>Profile</h3>
         <p>Name  : <span><?php echo isset($_SESSION['Student_Name']) ? htmlspecialchars($_SESSION['Student_Name']) : ''; ?></span></p>
-        <p>Email : <span><?php echo isset($_SESSION['Student_Mail'])     ? htmlspecialchars($_SESSION['Student_Mail'])     : ''; ?></span></p>
+        <p>Email : <span><?php echo isset($_SESSION['Email']) ? htmlspecialchars($_SESSION['Email']) : ''; ?></span></p>
         <div id="profileBTN">
             <button id="close" onclick="showProfile()">Close</button>
         </div>
