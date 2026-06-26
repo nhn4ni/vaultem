@@ -14,8 +14,21 @@ if (!$conn) {
     die("Connection failed: " . mysqli_connect_error());
 }
 
-$student_id = $_SESSION['Student_ID'] ?? 'S001';
+$student_id   = $_SESSION['Student_ID'] ?? '';
 $studentIdEsc = mysqli_real_escape_string($conn, $student_id);
+
+// ── Block if student already has an active booking ────────────────────────────
+$activeChk = mysqli_query($conn, "
+    SELECT COUNT(*) AS c FROM booking
+    WHERE Student_ID = '$studentIdEsc'
+      AND LOWER(Booking_Status) NOT IN ('rejected', 'collected')
+      AND Pickup_Date >= CURDATE()
+");
+$activeRow = mysqli_fetch_assoc($activeChk);
+if ($activeRow['c'] > 0) {
+    header("Location: mainStatus.php?msg=already_booked");
+    exit();
+}
 
 $genderQuery = mysqli_query($conn, "SELECT Gender FROM student WHERE Student_ID = '$studentIdEsc'");
 $studentGender = 'M';

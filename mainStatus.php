@@ -89,12 +89,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_booking_id']))
     $verifyStmt->close();
 }
 
+// ── Student ID (needed for all queries below) ─────────────────────────────────
+$student_id   = $_SESSION['Student_ID'];
+$studentIdEsc = $conn->real_escape_string($student_id);
+
+// ── Check if student has an active booking ────────────────────────────────────
+// Active = any booking that is NOT rejected, NOT collected, AND pickup date not yet passed
+$activeCheck = $conn->query("
+    SELECT COUNT(*) AS c FROM booking
+    WHERE Student_ID = '$studentIdEsc'
+      AND LOWER(Booking_Status) NOT IN ('rejected', 'collected')
+      AND Pickup_Date >= CURDATE()
+");
+$hasActiveBooking = ($activeCheck && $activeCheck->fetch_assoc()['c'] > 0);
+
 // ── Sort order ───────────────────────────────────────────────────────────────
 $order = (isset($_GET['sort']) && $_GET['sort'] === 'old') ? 'ASC' : 'DESC';
 
 // ── Fetch bookings for the logged-in student only ────────────────────────────
-$student_id   = $_SESSION['Student_ID'];
-$studentIdEsc = $conn->real_escape_string($student_id);
 
 $sql = "
     SELECT
@@ -246,7 +258,21 @@ $result = $conn->query($sql);
         <header>
             <h1 onclick="window.location.href='mainStatus.php'" style="cursor:pointer;">VaulteM</h1>
         </header>
-        <button type="button" id="booking" onclick="window.location.href='form.php'">Book space</button>
+        <button type="button" id="booking"
+            <?php if ($hasActiveBooking): ?>
+                disabled
+                title="You already have an active booking. You can book again after your pick-up date."
+                style="opacity:0.45; cursor:not-allowed; transform:none;"
+            <?php else: ?>
+                onclick="window.location.href='form.php'"
+            <?php endif; ?>>
+            Book space
+        </button>
+        <?php if ($hasActiveBooking): ?>
+            <p style="font-size:0.72rem; color:rgba(36,18,83,0.6); text-align:center; margin-top:6px; padding: 0 8px;">
+                Available after pick-up date
+            </p>
+        <?php endif; ?>
     </div>
 
     <div class="rightcontainer">
@@ -266,6 +292,12 @@ $result = $conn->query($sql);
         </div>
 
         <h1>Status</h1>
+
+        <?php if (isset($_GET['msg']) && $_GET['msg'] === 'already_booked'): ?>
+        <div style="background:#fff3cd; color:#856404; border:1px solid rgba(245,158,11,0.4); border-radius:12px; padding:10px 16px; font-size:0.85rem; font-weight:600; margin-bottom:14px;">
+            You already have an active booking. You can make a new booking after your current pick-up date has passed.
+        </div>
+        <?php endif; ?>
 
         <div class="filter-wrapper">
             <button id="filterBtn" data-order="<?php echo ($order === 'ASC') ? 'old' : 'recent'; ?>">
