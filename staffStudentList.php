@@ -181,7 +181,7 @@ $conn->close();
                     <h4>
                         <?php echo htmlspecialchars($st['Student_Name']); ?>
                         <?php if ($st['HasEmergency']): ?>
-                            <span class="emergency-badge" id="close">EMERGENCY</span>
+                            <span class="emergency-badge" >EMERGENCY</span>
                         <?php endif; ?>
                     </h4>
 
