@@ -203,6 +203,13 @@ $result = $conn->query($sql);
             .header-actions { width: 100%; justify-content: space-between; }
             .pay-btn        { margin-left: 0; }
         }
+
+        .pickup-note {
+        margin-top: 5px;
+        font-size: 0.85rem;
+        color: #dc3545;
+        font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -225,7 +232,7 @@ $result = $conn->query($sql);
                 <div id="profileSelect">
                     <button onclick="showProfile();">Profile</button>
                     <button onclick="window.location.href='settings.html'">Settings</button>
-                    <button onclick="window.location.href='studentverify.php'">Notification</button>
+                    <button onclick="window.location.href='settings.html'">Notification</button>
                     <button onclick="showLog();">Logout</button>
                 </div>
             </span>
@@ -305,6 +312,10 @@ $result = $conn->query($sql);
                 <?php if ($paymentRow): ?>
                     <p>Payment status: <?php echo $isPaid ? 'Paid' : (($paymentStatus === 'P' || strtolower($paymentStatus) === 'pending') ? 'Pending Payment (Pay Later)' : 'Unpaid'); ?></p>
                 <?php endif; ?>
+
+                <p class="pickup-note">
+                Note: Pickup time is 8:00 AM - 11:00 PM only
+</p>
             </div>
 
             <div class="button-container">
@@ -406,7 +417,6 @@ $result = $conn->query($sql);
             }
         });
     });
-
 </script>
 </body>
 </html>
