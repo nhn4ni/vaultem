@@ -65,8 +65,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->bind_param("i", $bid); $stmt->execute(); $stmt->close();
         header("Location: staffBookingDetail.php?id=$bid&msg=rejected"); exit();
     }
-    // Verify (send to student)
+    // Verify (send to student) — requires drop-off photo first
     if (isset($_POST['verify'])) {
+        $photoExists = !empty($_SESSION['dropoff_photo_' . $bid]);
+        if (!$photoExists) {
+            header("Location: staffBookingDetail.php?id=$bid&msg=no_photo"); exit();
+        }
         $stmt = $conn->prepare("UPDATE booking SET Booking_Status = 'Verification_Sent' WHERE Booking_ID = ? AND LOWER(Booking_Status) = 'approved'");
         $stmt->bind_param("i", $bid); $stmt->execute(); $stmt->close();
         header("Location: staffBookingDetail.php?id=$bid&msg=verified"); exit();
@@ -335,13 +339,15 @@ $conn->close();
         <h1>Booking Details</h1>
 
         <?php if (isset($_GET['msg'])): ?>
-        <div class="msg-banner <?php echo in_array($_GET['msg'], ['approved','verified','uploaded']) ? 'msg-success' : 'msg-info'; ?>">
+        <div class="msg-banner <?php echo in_array($_GET['msg'], ['approved','verified','uploaded','photo_cleared']) ? 'msg-success' : 'msg-info'; ?>">
             <?php
                 $msgs = [
                     'approved' => ' Booking approved.',
                     'rejected' => ' Booking rejected.',
                     'verified' => ' Verification request sent to student.',
-                    'uploaded' => ' Drop-off photo uploaded successfully.',
+                    'uploaded'      => 'Drop-off photo uploaded successfully.',
+                    'photo_cleared' => 'Photo removed successfully.',
+                    'no_photo'      => 'You must upload the drop-off photo before sending verification to the student.',
                 ];
                 echo $msgs[$_GET['msg']] ?? '';
             ?>
@@ -512,16 +518,23 @@ $conn->close();
                     </div>
                     <div class="verif-right">
                         <?php if ($studentConfirmed): ?>
-                            <span class="confirmed-tag"> Student Confirmed</span>
+                            <span class="confirmed-tag">Student Confirmed</span>
                         <?php elseif ($verifSent): ?>
-                            <span class="sent-tag"> Awaiting Student</span>
-                        <?php elseif ($bstat === 'approved'): ?>
+                            <span class="sent-tag">Awaiting Student</span>
+                        <?php elseif ($bstat === 'approved' && $uploadedPhoto): ?>
                             <form method="POST" style="display:inline;">
                                 <button type="submit" name="verify" class="verify-btn"
                                     onclick="return confirm('Send verification request to student for Booking #<?php echo $bid; ?>?')">
                                     Verify
                                 </button>
                             </form>
+                        <?php elseif ($bstat === 'approved' && !$uploadedPhoto): ?>
+                            <button class="verify-btn" disabled title="Upload drop-off photo first">
+                                Verify
+                            </button>
+                            <p style="font-size:0.72rem; color:#f59e0b; text-align:right; margin-top:4px;">
+                                Upload drop-off photo first
+                            </p>
                         <?php else: ?>
                             <button class="verify-btn" disabled title="Booking must be Approved first">
                                 Verify

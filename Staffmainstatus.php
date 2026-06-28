@@ -121,7 +121,7 @@ $conn->close();
         <header>
             <h1 onclick="window.location.href='staffMainStatus.php'" style="cursor:pointer;">VaulteM</h1>
         </header>
-        <button type="button" id="booking" onclick="window.location.href='staffmainstatus.php'">
+        <button type="button" id="booking" onclick="window.location.href='staffbookingrecords.php'">
             Manage Bookings
         </button>
     </div>
@@ -159,10 +159,8 @@ $conn->close();
             </div>
         </div>
 
-        <!-- Quick actions -->
-        <div class="section-label">Quick Actions</div>
         <div class="quick-actions">
-            <a class="qa-btn" href="Staffmainstatus.php">
+            <a class="qa-btn" href="staffbookingrecords.php">
                 <span class="qa-icon"></span>Bookings
             </a>
             <a class="qa-btn" href="Staffverifypanel.php">

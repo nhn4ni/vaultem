@@ -11,12 +11,24 @@ if ($conn->connect_error) die("Connection Failed: " . $conn->connect_error);
 
 $staff_name = $_SESSION['Staff_Name'] ?? 'Staff';
 
+// ── Handle delete student ─────────────────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_student_id'])) {
+    $delId = $conn->real_escape_string($_POST['delete_student_id']);
+    // Delete related records first
+    $conn->query("DELETE p FROM payment p JOIN booking b ON p.Booking_ID = b.Booking_ID WHERE b.Student_ID = '$delId'");
+    $conn->query("DELETE i FROM item i JOIN booking b ON i.Booking_ID = b.Booking_ID WHERE b.Student_ID = '$delId'");
+    $conn->query("DELETE FROM booking WHERE Student_ID = '$delId'");
+    $conn->query("DELETE FROM student WHERE Student_ID = '$delId'");
+    header("Location: staffStudentList.php?msg=deleted");
+    exit();
+}
+
 // ── Search ────────────────────────────────────────────────────────────────────
 $search    = trim($_GET['q'] ?? '');
 $searchSql = '';
 if ($search) {
     $s = $conn->real_escape_string($search);
-    $searchSql = "WHERE s.Student_Name LIKE '%$s%' OR s.Student_ID LIKE '%$s%' OR s.Student_Mail LIKE '%$s%'";
+    $searchSql = "WHERE s.Student_Name LIKE '%$s%' OR s.Student_ID LIKE '%$s%' OR s.Student_Mail LIKE '%$s%' OR rc.Residential_Block LIKE '%$s%'";
 }
 
 $students = $conn->query("
@@ -121,6 +133,23 @@ $conn->close();
 
         .result-count { font-size: 0.78rem; color: #8b82b5; margin-bottom: 14px; }
 
+        .msg-banner { padding: 10px 16px; border-radius: 12px; font-size: 0.85rem; font-weight: 600; margin-bottom: 18px; }
+        .msg-success { background: rgba(25,135,84,0.12); color: #198754; border: 1px solid rgba(25,135,84,0.3); }
+
+        .delete-btn {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c2c7;
+            padding: 7px 14px;
+            border-radius: 14px;
+            cursor: pointer;
+            font-size: 0.78rem;
+            font-weight: bold;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+        .delete-btn:hover { background: #f1aeb5; transform: translateY(-1px); }
+
         #profileContainer { position: relative; display: inline-block; cursor: pointer; }
         #userImage { vertical-align: middle; margin-left: 5px; }
         #profileSelect { display: none; position: absolute; right: 0; top: 25px; background-color: #241253; border: 1px solid #E8E9DE; border-radius: 8px; min-width: 130px; z-index: 10; }
@@ -158,8 +187,12 @@ $conn->close();
 
         <h1>Students</h1>
 
+        <?php if (isset($_GET['msg']) && $_GET['msg'] === 'deleted'): ?>
+        <div class="msg-banner msg-success">Student record deleted successfully.</div>
+        <?php endif; ?>
+
         <form method="GET" class="search-bar">
-            <input type="text" name="q" placeholder="Search by name, ID, or email…" value="<?php echo htmlspecialchars($search); ?>">
+            <input type="text" name="q" placeholder="Search by name, ID, email or college..." value="<?php echo htmlspecialchars($search); ?>">
             <button type="submit">Search</button>
             <?php if ($search): ?>
                 <a href="staffStudentList.php" style="color:#8b82b5; font-size:0.82rem; line-height:2.5;">Clear</a>
@@ -192,7 +225,12 @@ $conn->close();
                 <strong><?php echo $st['TotalBookings']; ?></strong>
                 Booking<?php echo $st['TotalBookings'] !== '1' ? 's' : ''; ?>
             </div>
-            <a class="view-btn" href="staffStudentDetail.php?id=<?php echo urlencode($st['Student_ID']); ?>">View →</a>
+            <a class="view-btn" href="staffStudentDetail.php?id=<?php echo urlencode($st['Student_ID']); ?>">View</a>
+            <form method="POST" style="display:inline;"
+                  onsubmit="return confirm('Delete student <?php echo htmlspecialchars(addslashes($st['Student_Name'])); ?> and all their booking records? This cannot be undone.')">
+                <input type="hidden" name="delete_student_id" value="<?php echo htmlspecialchars($st['Student_ID']); ?>">
+                <button type="submit" class="delete-btn">Delete</button>
+            </form>
         </div>
         <?php endwhile;
         else: ?>

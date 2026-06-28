@@ -19,9 +19,10 @@ $staff_name = $_SESSION['Staff_Name'] ?? 'Staff';
 $PENALTY_RATE = 2.00;
 
 // ── Filters ───────────────────────────────────────────────────────────────────
-$filterStatus = $_GET['status'] ?? 'all';
-$filterDate   = $_GET['date']   ?? 'all';   // this_month, last_month, all
-$search       = trim($_GET['q'] ?? '');
+$filterStatus  = $_GET['status']  ?? 'all';
+$filterDate    = $_GET['date']    ?? 'all';
+$filterCollege = $_GET['college'] ?? 'all';
+$search        = trim($_GET['q']  ?? '');
 
 $where = ["1=1"];
 
@@ -36,12 +37,22 @@ if ($filterDate === 'this_month') {
     $where[] = "MONTH(b.DropOff_Date) = MONTH(CURDATE() - INTERVAL 1 MONTH) AND YEAR(b.DropOff_Date) = YEAR(CURDATE() - INTERVAL 1 MONTH)";
 }
 
+if ($filterCollege !== 'all') {
+    $fc = $conn->real_escape_string($filterCollege);
+    $where[] = "rc.Residential_Block = '$fc'";
+}
+
 if ($search) {
     $s = $conn->real_escape_string($search);
-    $where[] = "(s.Student_Name LIKE '%$s%' OR s.Student_ID LIKE '%$s%' OR b.Booking_ID LIKE '%$s%')";
+    $where[] = "(s.Student_Name LIKE '%$s%' OR s.Student_ID LIKE '%$s%' OR b.Booking_ID LIKE '%$s%' OR rc.Residential_Block LIKE '%$s%')";
 }
 
 $whereSQL = implode(" AND ", $where);
+
+// ── College list for filter dropdown ─────────────────────────────────────────
+$collegeList = [];
+$clRes = $conn->query("SELECT DISTINCT Residential_Block FROM residential_college ORDER BY Residential_Block ASC");
+while ($cl = $clRes->fetch_assoc()) $collegeList[] = $cl['Residential_Block'];
 
 // ── Summary stats ─────────────────────────────────────────────────────────────
 $totalBookings  = $conn->query("SELECT COUNT(*) AS c FROM booking")->fetch_assoc()['c'];
@@ -58,6 +69,52 @@ $accumulatedPenalties = round($overdueRow['total_days'] * $PENALTY_RATE, 2);
 $statusBreakdown = [];
 $sbRes = $conn->query("SELECT Booking_Status, COUNT(*) AS c FROM booking GROUP BY Booking_Status ORDER BY c DESC");
 while ($sb = $sbRes->fetch_assoc()) $statusBreakdown[] = $sb;
+
+// ── Bookings per college (for bar chart) ──────────────────────────────────────
+$collegeChart = [];
+$ccRes = $conn->query("
+    SELECT rc.Residential_Block, COUNT(b.Booking_ID) AS total,
+           SUM(CASE WHEN LOWER(b.Booking_Status) = 'approved' THEN 1 ELSE 0 END) AS approved,
+           SUM(CASE WHEN LOWER(b.Booking_Status) = 'pending'  THEN 1 ELSE 0 END) AS pending
+    FROM booking b
+    JOIN student s ON b.Student_ID = s.Student_ID
+    JOIN residential_college rc ON s.Residential_ID = rc.Residential_ID
+    GROUP BY rc.Residential_Block
+    ORDER BY total DESC
+");
+while ($cc = $ccRes->fetch_assoc()) $collegeChart[] = $cc;
+
+// ── Monthly bookings trend (last 6 months) ────────────────────────────────────
+$monthlyTrend = [];
+$mtRes = $conn->query("
+    SELECT DATE_FORMAT(Booking_Date, '%b %Y') AS month_label,
+           DATE_FORMAT(Booking_Date, '%Y-%m') AS month_key,
+           COUNT(*) AS total
+    FROM booking
+    WHERE Booking_Date >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
+    GROUP BY month_key, month_label
+    ORDER BY month_key ASC
+");
+while ($mt = $mtRes->fetch_assoc()) $monthlyTrend[] = $mt;
+
+// ── Storage usage per college ─────────────────────────────────────────────────
+$storagePerCollege = [];
+$spRes = $conn->query("
+    SELECT rc.Residential_Block,
+           COALESCE(SUM(ss.Size), 0) AS TotalCapacity,
+           COALESCE((
+               SELECT SUM(i2.Quantity) FROM item i2
+               JOIN booking b2 ON i2.Booking_ID = b2.Booking_ID
+               JOIN student s2 ON b2.Student_ID = s2.Student_ID
+               WHERE s2.Residential_ID = rc.Residential_ID
+                 AND LOWER(b2.Booking_Status) = 'approved'
+           ), 0) AS UsedCapacity
+    FROM residential_college rc
+    JOIN storespace ss ON ss.Residential_ID = rc.Residential_ID
+    GROUP BY rc.Residential_ID, rc.Residential_Block
+    ORDER BY rc.Residential_Block
+");
+while ($sp = $spRes->fetch_assoc()) $storagePerCollege[] = $sp;
 
 // ── Main report data ──────────────────────────────────────────────────────────
 $reportData = $conn->query("
@@ -387,174 +444,141 @@ $conn->close();
             </div>
         </div>
 
-        <div class="summary-top">
+        <!-- ── Charts section ── -->
+        <div class="section-label">Analytics</div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:26px; flex-wrap:wrap;">
 
-            <div class="storage-card">
-                <h4>Storage Capacity</h4>
-                <div class="storage-bar-wrap">
-                    <div class="storage-bar-fill <?php echo $storagePct >= 90 ? 'crit' : ($storagePct >= 80 ? 'warn' : ''); ?>"
-                         style="width:<?php echo $storagePct; ?>%"></div>
-                </div>
-                <div class="storage-info">
-                    <span><?php echo $storageUsed; ?> / <?php echo $storageTotal; ?> units used</span>
-                    <span style="font-weight:700; color:<?php echo $storagePct >= 90 ? '#ef4444' : ($storagePct >= 80 ? '#f59e0b' : '#22c55e'); ?>">
-                        <?php echo $storagePct; ?>%
-                    </span>
-                </div>
-                <?php if ($storagePct >= 80): ?>
-                <p style="color:#f59e0b; font-size:0.75rem; margin-top:8px; font-weight:600;">⚠ Manual approval required for new bookings.</p>
-                <?php endif; ?>
+            <!-- Bookings per College bar chart -->
+            <div style="background:#f1f0ea; border-radius:16px; padding:18px 20px; color:#1e1b4b;">
+                <h4 style="font-size:0.78rem; text-transform:uppercase; color:#888; letter-spacing:0.5px; margin-bottom:14px;">Bookings per College</h4>
+                <canvas id="collegeChart" height="200"></canvas>
             </div>
 
-            <div class="breakdown-card">
-                <h4>Booking Status Breakdown</h4>
-                <?php
-                $colorMap = [
-                    'pending'  => 'fill-pending',
-                    'approved' => 'fill-approved',
-                    'rejected' => 'fill-rejected',
-                ];
-                foreach ($statusBreakdown as $sb):
-                    $pct = $totalBookings > 0 ? round(($sb['c'] / $totalBookings) * 100) : 0;
-                    $cls = $colorMap[strtolower($sb['Booking_Status'])] ?? 'fill-other';
-                ?>
-                <div class="breakdown-row">
-                    <span style="min-width:110px; font-size:0.8rem;"><?php echo htmlspecialchars($sb['Booking_Status']); ?></span>
-                    <div class="breakdown-bar">
-                        <div class="breakdown-fill <?php echo $cls; ?>" style="width:<?php echo $pct; ?>%"></div>
-                    </div>
-                    <span class="breakdown-count"><?php echo $sb['c']; ?></span>
-                </div>
-                <?php endforeach; ?>
+            <!-- Booking status doughnut chart -->
+            <div style="background:#f1f0ea; border-radius:16px; padding:18px 20px; color:#1e1b4b;">
+                <h4 style="font-size:0.78rem; text-transform:uppercase; color:#888; letter-spacing:0.5px; margin-bottom:14px;">Booking Status Distribution</h4>
+                <canvas id="statusChart" height="200"></canvas>
+            </div>
+
+            <!-- Monthly trend line chart -->
+            <div style="background:#f1f0ea; border-radius:16px; padding:18px 20px; color:#1e1b4b;">
+                <h4 style="font-size:0.78rem; text-transform:uppercase; color:#888; letter-spacing:0.5px; margin-bottom:14px;">Booking Trend (Last 6 Months)</h4>
+                <canvas id="trendChart" height="200"></canvas>
+            </div>
+
+            <!-- Storage usage per college bar chart -->
+            <div style="background:#f1f0ea; border-radius:16px; padding:18px 20px; color:#1e1b4b;">
+                <h4 style="font-size:0.78rem; text-transform:uppercase; color:#888; letter-spacing:0.5px; margin-bottom:14px;">Storage Usage per College (%)</h4>
+                <canvas id="storageChart" height="200"></canvas>
             </div>
         </div>
 
-        <div class="section-label">Booking Records</div>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+        <script>
+        // ── Bookings per college bar chart ────────────────────────────────────
+        new Chart(document.getElementById('collegeChart'), {
+            type: 'bar',
+            data: {
+                labels: <?php echo json_encode(array_column($collegeChart, 'Residential_Block')); ?>,
+                datasets: [
+                    {
+                        label: 'Approved',
+                        data: <?php echo json_encode(array_column($collegeChart, 'approved')); ?>,
+                        backgroundColor: '#22c55e'
+                    },
+                    {
+                        label: 'Pending',
+                        data: <?php echo json_encode(array_column($collegeChart, 'pending')); ?>,
+                        backgroundColor: '#f59e0b'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { position: 'bottom', labels: { font: { family: 'Courier New' }, boxWidth: 12 } } },
+                scales: {
+                    x: { stacked: true, ticks: { font: { family: 'Courier New', size: 10 } } },
+                    y: { stacked: true, beginAtZero: true, ticks: { font: { family: 'Courier New', size: 10 }, stepSize: 1 } }
+                }
+            }
+        });
 
-        <form method="GET" style="margin-bottom:0;">
-            <div class="filter-bar">
-                <?php
-                $statuses = ['all' => 'All', 'pending' => 'Pending', 'approved' => 'Approved', 'rejected' => 'Rejected', 'collected' => 'Collected'];
-                foreach ($statuses as $sv => $sl):
-                ?>
-                <a href="?status=<?php echo $sv; ?>&date=<?php echo $filterDate; ?>&q=<?php echo urlencode($search); ?>"
-                   class="filter-chip <?php echo $filterStatus === $sv ? 'active' : ''; ?>">
-                    <?php echo $sl; ?>
-                </a>
-                <?php endforeach; ?>
+        // ── Status doughnut chart ─────────────────────────────────────────────
+        new Chart(document.getElementById('statusChart'), {
+            type: 'doughnut',
+            data: {
+                labels: <?php echo json_encode(array_column($statusBreakdown, 'Booking_Status')); ?>,
+                datasets: [{
+                    data: <?php echo json_encode(array_column($statusBreakdown, 'c')); ?>,
+                    backgroundColor: ['#f59e0b','#22c55e','#ef4444','#8b82b5','#3b5bdb','#198754']
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { position: 'bottom', labels: { font: { family: 'Courier New' }, boxWidth: 12 } } }
+            }
+        });
 
-                <span style="color:#8b82b5; font-size:0.75rem; padding: 0 4px;">|</span>
+        // ── Monthly trend line chart ──────────────────────────────────────────
+        new Chart(document.getElementById('trendChart'), {
+            type: 'line',
+            data: {
+                labels: <?php echo json_encode(array_column($monthlyTrend, 'month_label')); ?>,
+                datasets: [{
+                    label: 'Bookings',
+                    data: <?php echo json_encode(array_column($monthlyTrend, 'total')); ?>,
+                    borderColor: '#7c5cfc',
+                    backgroundColor: 'rgba(124,92,252,0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 5,
+                    pointBackgroundColor: '#7c5cfc'
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { ticks: { font: { family: 'Courier New', size: 10 } } },
+                    y: { beginAtZero: true, ticks: { font: { family: 'Courier New', size: 10 }, stepSize: 1 } }
+                }
+            }
+        });
 
-                <?php
-                $dates = ['all' => 'All Time', 'this_month' => 'This Month', 'last_month' => 'Last Month'];
-                foreach ($dates as $dv => $dl):
-                ?>
-                <a href="?status=<?php echo $filterStatus; ?>&date=<?php echo $dv; ?>&q=<?php echo urlencode($search); ?>"
-                   class="filter-chip <?php echo $filterDate === $dv ? 'active' : ''; ?>">
-                    <?php echo $dl; ?>
-                </a>
-                <?php endforeach; ?>
-            </div>
+        // ── Storage usage per college horizontal bar chart ────────────────────
+        new Chart(document.getElementById('storageChart'), {
+            type: 'bar',
+            data: {
+                labels: <?php echo json_encode(array_column($storagePerCollege, 'Residential_Block')); ?>,
+                datasets: [{
+                    label: 'Used (%)',
+                    data: <?php
+                        $usagePcts = array_map(function($r) {
+                            return $r['TotalCapacity'] > 0 ? round(($r['UsedCapacity'] / $r['TotalCapacity']) * 100) : 0;
+                        }, $storagePerCollege);
+                        echo json_encode($usagePcts);
+                    ?>,
+                    backgroundColor: <?php
+                        $colors = array_map(function($p) {
+                            return $p >= 90 ? '#ef4444' : ($p >= 60 ? '#f59e0b' : '#22c55e');
+                        }, $usagePcts);
+                        echo json_encode($colors);
+                    ?>
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { beginAtZero: true, max: 100, ticks: { font: { family: 'Courier New', size: 10 }, callback: v => v + '%' } },
+                    y: { ticks: { font: { family: 'Courier New', size: 10 } } }
+                }
+            }
+        });
+        </script>
 
-            <div style="display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap;">
-                <input class="search-input" type="text" name="q" placeholder="Search by student name, ID, or booking ID…"
-                       value="<?php echo htmlspecialchars($search); ?>">
-                <input type="hidden" name="status" value="<?php echo $filterStatus; ?>">
-                <input type="hidden" name="date"   value="<?php echo $filterDate; ?>">
-                <button type="submit" class="search-btn">Search</button>
-                <?php if ($search): ?>
-                <a href="?status=<?php echo $filterStatus; ?>&date=<?php echo $filterDate; ?>"
-                   style="color:#8b82b5; font-size:0.82rem; line-height:2.4;">✕ Clear</a>
-                <?php endif; ?>
-                <button type="button" class="export-btn" onclick="exportCSV()">Export CSV</button>
-            </div>
-        </form>
-
-        <div class="table-wrap">
-            <table class="report-table" id="reportTable">
-                <thead>
-                    <tr>
-                        <th>Booking ID</th>
-                        <th>Student</th>
-                        <th>Student ID</th>
-                        <th>College</th>
-                        <th>Status</th>
-                        <th>Priority</th>
-                        <th>Drop-off</th>
-                        <th>Pick-up</th>
-                        <th>Items</th>
-                        <th>Storage Fee (RM)</th>
-                        <th>Payment</th>
-                        <th>Method</th>
-                        <th>Paid (RM)</th>
-                    </tr>
-                </thead>
-                <tbody>
-                <?php
-                $rowCount = 0;
-                if ($reportData && $reportData->num_rows > 0):
-                    while ($row = $reportData->fetch_assoc()):
-                        $rowCount++;
-                        $bs  = strtolower($row['Booking_Status']);
-                        $ps  = strtolower($row['Payment_Status'] ?? '');
-                        $isPaid = in_array($ps, ['y','paid']);
-                        $isLater = in_array($ps, ['p','pending']);
-
-                        if ($bs === 'pending')        $bBadge = 'badge-pending';
-                        elseif ($bs === 'approved')   $bBadge = 'badge-approved';
-                        elseif ($bs === 'rejected')   $bBadge = 'badge-rejected';
-                        elseif ($bs === 'collected')  $bBadge = 'badge-collected';
-                        else                          $bBadge = 'badge-other';
-
-                        $pBadge = $isPaid ? 'badge-paid' : ($isLater ? 'badge-later' : 'badge-unpaid');
-                        $pLabel = $isPaid ? 'Paid' : ($isLater ? 'Pay Later' : 'Unpaid');
-
-                        $daysOverdue = max(0, (int)$row['DaysOverdue']);
-                        $isOverdueNow = ($bs === 'approved' && $daysOverdue > 0);
-                ?>
-                <tr>
-                    <td><a href="staffBookingDetail.php?id=<?php echo $row['Booking_ID']; ?>" class="bid-link">#<?php echo $row['Booking_ID']; ?></a></td>
-                    <td><?php echo htmlspecialchars($row['Student_Name']); ?></td>
-                    <td><?php echo htmlspecialchars($row['Student_ID']); ?></td>
-                    <td><?php echo htmlspecialchars($row['Residential_Block'] ?? 'N/A'); ?></td>
-                    <td>
-                        <span class="badge <?php echo $bBadge; ?>"><?php echo htmlspecialchars($row['Booking_Status']); ?></span>
-                        <?php if ($isOverdueNow): ?>
-                            <span class="overdue-text"><?php echo $daysOverdue; ?>d Overdue</span>
-                        <?php endif; ?>
-                    </td>
-                    <td><?php echo $row['Booking_Priority'] === 'Y' ? '<span class="prio-badge">EMERGENCY</span>' : 'Normal'; ?></td>
-                    <td><?php echo htmlspecialchars($row['DropOff_Date']); ?></td>
-                    <td><?php echo htmlspecialchars($row['Pickup_Date']); ?></td>
-                    <td><?php echo $row['TotalItem']; ?></td>
-                    <td><?php echo number_format((float)$row['TotalFee'], 2); ?></td>
-                    <td><span class="badge <?php echo $pBadge; ?>"><?php echo $pLabel; ?></span></td>
-                    <td><?php echo htmlspecialchars($row['Payment_Method'] ?? '-'); ?></td>
-                    <td><?php echo number_format((float)$row['PaidAmount'], 2); ?></td>
-                </tr>
-                <?php endwhile;
-                else: ?>
-                <tr><td colspan="13" style="text-align:center; color:#888; padding:30px;">No records found.</td></tr>
-                <?php endif; ?>
-                </tbody>
-                <?php if ($rowCount > 0): ?>
-                <tfoot>
-                    <tr style="background:#e8e7df; font-weight:700; font-size:0.82rem;">
-                        <td colspan="8" style="padding:10px 14px; color:#555;">Total (<?php echo $rowCount; ?> records)</td>
-                        <td style="padding:10px 14px; color:#1e1b4b;">—</td>
-                        <td style="padding:10px 14px; color:#1e1b4b;">
-                            RM <?php echo number_format((float)$filteredTotalFee, 2); ?>
-                        </td>
-                        <td colspan="3" style="padding:10px 14px; text-align: right; color: #dc3545;">
-                            Est. Filtered Penalty: RM <?php echo number_format($filteredPenaltyEst, 2); ?>
-                        </td>
-                    </tr>
-                </tfoot>
-                <?php endif; ?>
-            </table>
-        </div>
-
-    </div></div><div id="logoutPopup" class="hidden">
+<div id="logoutPopup" class="hidden">
     <div id="logoutText">
         <p>Are you sure you want to logout?</p>
         <div id="logoutButton">
