@@ -162,7 +162,7 @@ $conn->close();
             <input type="text" name="q" placeholder="Search by name, ID, or email…" value="<?php echo htmlspecialchars($search); ?>">
             <button type="submit">Search</button>
             <?php if ($search): ?>
-                <a href="staffStudentList.php" style="color:#8b82b5; font-size:0.82rem; line-height:2.5;">✕ Clear</a>
+                <a href="staffStudentList.php" style="color:#8b82b5; font-size:0.82rem; line-height:2.5;">Clear</a>
             <?php endif; ?>
         </form>
 
