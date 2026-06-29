@@ -148,27 +148,6 @@ $result = $conn->query($sql);
             position: relative;
         }
 
-        /* Minimalist 'X' Cancel Button */
-        .small-cancel-btn {
-            position: absolute;
-            top: 12px;
-            right: 15px;
-            background: none;
-            border: none;
-            color: #dc3545;
-            font-size: 1.4rem;
-            font-weight: bold;
-            line-height: 1;
-            cursor: pointer;
-            padding: 0;
-            transition: transform 0.2s ease, color 0.2s ease;
-            z-index: 5;
-        }
-        .small-cancel-btn:hover {
-            color: #bd2130;
-            transform: scale(1.2);
-        }
-
         .pay-btn {
             background-color: #4CAF50; color: white; border: none; border-radius: 15px;
             padding: 8px 20px; font-weight: bold; cursor: pointer;
@@ -233,20 +212,37 @@ $result = $conn->query($sql);
             .header-actions { width: 100%; justify-content: space-between; }
             .pay-btn        { margin-left: 0; }
         }
-          .pickup-note {
-        margin-top: 5px;
-        font-size: 0.85rem;
-        color: #dc3545;
-        font-weight: bold;
-        }
-        .first-booking-link {
-        color: #209708;   /* merah terang */
-        font-weight: bold;
-        text-decoration: underline;
+
+        .pickup-note {
+            margin-top: 5px;
+            font-size: 0.85rem;
+            color: #dc3545;
+            font-weight: bold;
         }
 
+        .small-cancel-btn {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 6px 14px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.2s ease;
+            margin-top: 8px;
+            display: inline-block;
+        }
+        .small-cancel-btn:hover { background-color: #bd2130; }
+        .small-cancel-btn:active { transform: scale(0.95); }
+
+        .first-booking-link {
+            color: #209708;
+            font-weight: bold;
+            text-decoration: underline;
+        }
         .first-booking-link:hover {
-        color: #209708;
+            color: #209708;
         }
         
     </style>
@@ -337,10 +333,6 @@ $result = $conn->query($sql);
                 $currentStatusLower = strtolower($bookingStatus);
         ?>
         <div class="status-card">
-            <?php if ($currentStatusLower === 'pending' && !$isPaid): ?>
-                <button class="small-cancel-btn" title="Cancel Booking" onclick="confirmCancellation(<?php echo $bookingID; ?>)">&times;</button>
-            <?php endif; ?>
-
             <div class="card-header">
                 <div class="header-main">
                     <span class="order-id">ID: <?php echo htmlspecialchars($bookingID); ?></span>
@@ -386,8 +378,11 @@ $result = $conn->query($sql);
                 <?php endif; ?>
 
                 <p class="pickup-note">
-                Note: Drop-off and Pick-up time is 8:00 AM - 11:00 AM only
-</p>
+                    Note: Drop-off and Pick-up time is 8:00 AM - 11:00 AM only
+                </p>
+                <?php if ($currentStatusLower === 'pending' && !$isPaid): ?>
+                    <button class="small-cancel-btn" onclick="confirmCancellation(<?php echo $bookingID; ?>)">Cancel Booking</button>
+                <?php endif; ?>
             </div>
 
             <div class="button-container">
@@ -415,9 +410,9 @@ $result = $conn->query($sql);
         <?php endwhile;
         else: ?>
             <p class="no-booking">
-    No bookings found. <a href="form.php" class="first-booking-link">Make your first booking!</a>
-</p>
-<?php endif; ?>
+                No bookings found. <a href="form.php" class="first-booking-link">Make your first booking!</a>
+            </p>
+        <?php endif; ?>
 
     </div>
 </div>
