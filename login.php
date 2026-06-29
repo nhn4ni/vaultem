@@ -127,7 +127,7 @@ $conn->close();
             Don't have an account? <a href="signin.php">Register here</a>
         </p>
         <p>
-            <a href="newpass.php">Forgot password?</a>
+            <a href="forgotpass.php">Forgot password?</a>
         </p>
     </div>
 </div>
