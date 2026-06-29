@@ -78,6 +78,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['step'] ?? '') === '1') {
         $stmt->close();
 
         $found = false;
+        $uid   = '';
+        $uname = '';
+        $utype = '';
+
         if ($res->num_rows === 1) {
             $row   = $res->fetch_assoc();
             $found = true;
