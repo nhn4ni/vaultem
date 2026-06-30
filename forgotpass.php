@@ -3,7 +3,7 @@ session_start();
 
 // ── PHPMailer credentials ─────────────────────────────────────────────────────
 define('MAIL_USER', 'muhdfariospol@gmail.com');
-define('MAIL_PASS', 'nbkw rovv xsil rkcj');
+define('MAIL_PASS', '');
 define('MAIL_FROM', 'muhdfariospol@gmail.com');
 define('CODE_EXPIRY', 600); // 10 minutes
 
@@ -34,7 +34,7 @@ function sendCode(string $toEmail, string $toName, string $code): bool {
         $mail->addAddress($toEmail, $toName);
 
         $mail->isHTML(true);
-        $mail->Subject = 'VaulteM – Password Reset Code';
+        $mail->Subject = 'VaulteM: Password Reset Code';
         $mail->Body    = "
         <div style='font-family:Courier New,monospace;max-width:480px;margin:0 auto;
                     background:#241253;color:#E8E9DE;border-radius:16px;padding:32px;'>
