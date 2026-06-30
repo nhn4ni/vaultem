@@ -3,7 +3,7 @@ session_start();
 
 // ── PHPMailer credentials ─────────────────────────────────────────────────────
 define('MAIL_USER', 'muhdfariospol@gmail.com');
-define('MAIL_PASS', '');
+define('MAIL_PASS', 'nbkw rovv xsil rkcj');
 define('MAIL_FROM', 'muhdfariospol@gmail.com');
 define('CODE_EXPIRY', 600); // 10 minutes
 
