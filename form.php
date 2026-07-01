@@ -444,6 +444,26 @@ mysqli_close($conn);
             font-size: 1rem;
         }
 
+        .sizeGuideLink {
+            margin-top: -15px;
+            margin-bottom: 30px;
+            text-align: right;
+        }
+
+        #sizeGuideBtn {
+            background-color: #241253;
+            color: #f1f0ea;
+            border: none;
+            border-radius: 25px;
+            padding: 10px 25px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        #sizeGuideBtn:hover {
+            background-color: #3a1e7a;
+        }
+
         .feeFooter {
             position: fixed;
             bottom: 0;
@@ -719,6 +739,11 @@ mysqli_close($conn);
                         <span class="itemPrice">RM 5.00 / item</span>
                     </div>
                     <input id="otherQty" type="number" name="otherQty" min="0" max="3" value="0" oninput="calculateTotal(); checkItemLimit()">
+                </div>
+
+                <!-- View size guide -->
+                <div class="sizeGuideLink">
+                    <button type="button" id="sizeGuideBtn" onclick="window.open('size.php', '_blank')">View size guide &#8594;</button>
                 </div>
 
                 <input type="hidden" id="dropOffDate" name="dropOffDate" value="">
