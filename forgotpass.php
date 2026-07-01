@@ -208,7 +208,7 @@ $conn->close();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VaulteM – Reset Password</title>
     <link rel="icon" type="image/x-icon" href="vaultemLogo.ico">
-    <link rel="stylesheet" href="newpasss.css">
+    <link rel="stylesheet" href="forgotpass.css">
     <link rel="stylesheet" href="mobile.css">
     <style>
         .rightcontainer {
