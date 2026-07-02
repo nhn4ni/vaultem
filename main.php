@@ -21,7 +21,7 @@ $userName = $_SESSION['User_Name'] ?? 'User';
 
     <link rel="stylesheet" href="mobile.css">
     <style>
-        * { font-family: 'Courier New', Courier, monospace; box-sizing: border-box; }
+        * { font-family: 'Inter', sans-serif; box-sizing: border-box; }
         body { background-color: #E8E9DE; margin: 0; padding: 40px; }
         h1   { color: #241253; }
         .btn {

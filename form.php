@@ -185,7 +185,7 @@ mysqli_close($conn);
     <link rel="stylesheet" href="mobile.css" type="text/css">
     <style>
         * {
-            font-family: 'Courier New', Courier, monospace;
+            font-family: 'Inter', sans-serif;
             box-sizing: border-box;
         }
 

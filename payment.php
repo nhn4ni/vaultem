@@ -93,7 +93,7 @@ if ($type === 'penalty') {
         <title>VaulteM - Penalty Payment</title>
         <link rel="icon" type="image/x-icon" href="vaultemLogo.ico">
         <style>
-            * { font-family: 'Courier New', Courier, monospace; box-sizing: border-box; }
+            * { font-family: 'Inter', sans-serif; box-sizing: border-box; }
             body { background-color: #E8E9DE; color: #241253; margin: 0; }
             #body2 { margin: 0; height: 100vh; display: flex; justify-content: center; align-items: center; }
             .back { position: absolute; border-style: none; background-color: #E8E9DE; font-size: 1.2rem; font-weight: bold; color: #241253; margin: 15px; cursor: pointer; }

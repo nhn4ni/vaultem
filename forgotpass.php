@@ -36,7 +36,7 @@ function sendCode(string $toEmail, string $toName, string $code): bool {
         $mail->isHTML(true);
         $mail->Subject = 'VaulteM: Password Reset Code';
         $mail->Body    = "
-        <div style='font-family:Courier New,monospace;max-width:480px;margin:0 auto;
+        <div style='font-family: 'Inter', sans-serif;max-width:480px;margin:0 auto;
                     background:#241253;color:#E8E9DE;border-radius:16px;padding:32px;'>
             <h2 style='margin:0 0 4px;color:#b084ff;'>VaulteM</h2>
             <p style='color:rgba(232,233,222,0.5);margin:0 0 28px;font-size:13px;'>UTeM Store Management</p>

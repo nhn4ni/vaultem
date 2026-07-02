@@ -10,7 +10,7 @@ session_start();
     <link rel="icon" type="image/x-icon" href="vaultemLogo.ico">
     <style>
         * {
-            font-family: 'Courier New', Courier, monospace;
+            font-family: 'Inter', sans-serif;
             box-sizing: border-box;
         }
 

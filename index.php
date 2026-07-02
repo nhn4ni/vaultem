@@ -14,7 +14,7 @@
 
 <style>
     * {
-        font-family: 'Courier New', Courier, monospace;
+        font-family: 'Inter', sans-serif;
     }
 
     body {
