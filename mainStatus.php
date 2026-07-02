@@ -12,6 +12,9 @@ if ($conn->connect_error) {
     die("Connection Failed: " . $conn->connect_error);
 }
 
+require_once 'autoCancelExpired.php';
+autoCancelExpiredBookings($conn);
+
 // ── Ensure Student_Mail is in session ──────────────────────────────────────
 if (!isset($_SESSION['Student_Mail']) || empty($_SESSION['Student_Mail'])) {
     $student_id = $_SESSION['Student_ID'];
@@ -98,7 +101,7 @@ $studentIdEsc = $conn->real_escape_string($student_id);
 $activeCheck = $conn->query("
     SELECT COUNT(*) AS c FROM booking
     WHERE Student_ID = '$studentIdEsc'
-      AND LOWER(Booking_Status) NOT IN ('rejected', 'collected')
+      AND LOWER(Booking_Status) NOT IN ('rejected', 'collected', 'cancelled_unpaid')
       AND Pickup_Date >= CURDATE()
 ");
 $hasActiveBooking = ($activeCheck && $activeCheck->fetch_assoc()['c'] > 0);
@@ -115,6 +118,8 @@ $sql = "
         b.Pickup_Date,
         b.Booking_Status,
         b.Booking_Priority,
+        b.Rejection_Reason,
+        b.Rejection_Photo,
         s.Student_Name,
         rc.Residential_Block,
         IFNULL((SELECT SUM(Quantity) FROM item WHERE Booking_ID = b.Booking_ID), 0) AS TotalItem,
@@ -127,7 +132,7 @@ $sql = "
     WHERE b.Student_ID = '$studentIdEsc'
     GROUP BY
         b.Booking_ID, b.DropOff_Date, b.Pickup_Date,
-        b.Booking_Status, b.Booking_Priority,
+        b.Booking_Status, b.Booking_Priority, b.Rejection_Reason, b.Rejection_Photo,
         s.Student_Name, rc.Residential_Block
     ORDER BY b.Booking_ID $order
 ";
@@ -162,6 +167,7 @@ $result = $conn->query($sql);
         .status-pending  { background-color: #fff3cd; color: #856404; }
         .status-approved { background-color: #d4edda; color: #155724; }
         .status-rejected { background-color: #f8d7da; color: #721c24; }
+        .status-cancelled { background-color: #e2e3e5; color: #495057; }
         .header-main    { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding-right: 25px; } 
         .header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         .priority-badge {
@@ -244,6 +250,35 @@ $result = $conn->query($sql);
         .first-booking-link:hover {
             color: #209708;
         }
+
+        /* ── Review / Rejection notes ── */
+        .review-note {
+            margin-top: 10px;
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid rgba(133,100,4,0.25);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 0.85rem;
+        }
+        .rejection-note {
+            margin-top: 10px;
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid rgba(114,28,36,0.25);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 0.85rem;
+        }
+        .cancelled-note {
+            margin-top: 10px;
+            background: #e2e3e5;
+            color: #495057;
+            border: 1px solid rgba(73,80,87,0.25);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 0.85rem;
+        }
         
     </style>
 </head>
@@ -295,6 +330,12 @@ $result = $conn->query($sql);
         </div>
         <?php endif; ?>
 
+        <?php if (isset($_GET['msg']) && $_GET['msg'] === 'booking_submitted'): ?>
+        <div style="background:#cfe2ff; color:#084298; border:1px solid rgba(8,66,152,0.3); border-radius:12px; padding:10px 16px; font-size:0.85rem; font-weight:600; margin-bottom:14px;">
+            Your booking has been submitted and is now awaiting staff review. You'll be able to pay once it's approved.
+        </div>
+        <?php endif; ?>
+
         <div class="filter-wrapper">
             <button id="filterBtn" data-order="<?php echo ($order === 'ASC') ? 'old' : 'recent'; ?>">
                 <span id="filterLabel"><?php echo ($order === 'ASC') ? 'Old to Recent' : 'Recent to Old'; ?></span>
@@ -331,6 +372,19 @@ $result = $conn->query($sql);
                 
                 // Helper variable to handle case-insensitive checks for button rendering
                 $currentStatusLower = strtolower($bookingStatus);
+
+                // Friendly label + badge class (handles the auto-cancelled state separately from staff rejection)
+                $displayStatus = $bookingStatus;
+                if ($currentStatusLower === 'cancelled_unpaid') {
+                    $displayStatus = 'Cancelled (Unpaid)';
+                    $statusBadgeClass = 'status-cancelled';
+                } elseif ($currentStatusLower === 'pending') {
+                    $statusBadgeClass = 'status-pending';
+                } elseif ($currentStatusLower === 'approved') {
+                    $statusBadgeClass = 'status-approved';
+                } else {
+                    $statusBadgeClass = 'status-rejected';
+                }
         ?>
         <div class="status-card">
             <div class="card-header">
@@ -340,16 +394,13 @@ $result = $conn->query($sql);
                         <span class="priority-badge">EMERGENCY</span>
                     <?php endif; ?>
                     <div class="header-actions">
-                        <span class="status-text <?php
-                            echo $currentStatusLower === 'pending'  ? 'status-pending'  :
-                                ($currentStatusLower === 'approved' ? 'status-approved' : 'status-rejected');
-                        ?>">
-                            <?php echo htmlspecialchars($bookingStatus); ?>
+                        <span class="status-text <?php echo $statusBadgeClass; ?>">
+                            <?php echo htmlspecialchars($displayStatus); ?>
                         </span>
 
                         <?php if ($isPaid): ?>
                             <button class="pay-btn paid" disabled> Paid</button>
-                        <?php elseif ($currentStatusLower !== 'rejected'): ?>
+                        <?php elseif ($currentStatusLower === 'approved'): ?>
                             <button class="pay-btn"
                                     onclick="redirectToPayment('<?php echo $bookingID; ?>', <?php echo (float)$totalAmount; ?>)">
                                 Pay Now
@@ -375,6 +426,27 @@ $result = $conn->query($sql);
                     </p>
                 <?php else: ?>
                     <p>Payment status: <span style="color:#856404;">Unpaid</span></p>
+                <?php endif; ?>
+
+                <?php if ($currentStatusLower === 'pending'): ?>
+                <?php elseif ($currentStatusLower === 'rejected'): ?>
+                    <div class="rejection-note">
+                        <strong>Rejected</strong>
+                        <?php if (!empty($row['Rejection_Reason'])): ?>
+                            : <?php echo htmlspecialchars($row['Rejection_Reason']); ?>
+                        <?php else: ?>
+                            . No reason was provided by staff.
+                        <?php endif; ?>
+                        <?php if (!empty($row['Rejection_Photo'])): ?>
+                            <br>
+                            <img src="<?php echo htmlspecialchars($row['Rejection_Photo']); ?>" alt="Rejection evidence"
+                                 style="max-width:220px; border-radius:10px; display:block; margin-top:8px; border:1px solid rgba(114,28,36,0.25);">
+                        <?php endif; ?>
+                    </div>
+                <?php elseif ($currentStatusLower === 'cancelled_unpaid'): ?>
+                    <div class="cancelled-note">
+                        <strong>Automatically Cancelled</strong> — payment wasn't completed before your chosen drop-off date, so this booking and its reserved slot were released.
+                    </div>
                 <?php endif; ?>
 
                 <p class="pickup-note">

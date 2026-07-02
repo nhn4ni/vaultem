@@ -14,8 +14,7 @@ $bid = intval($_GET['id'] ?? 0);
 
 if (!$bid) { header("Location: staffMainStatus.php"); exit(); }
 
-// ── Storage capacity based on storespace table ────────────────────────────────
-// Get the student's residential college for this booking
+// ── Storage capacity (informational only — no longer gates approval) ─────────
 $collegeRes = $conn->query("
     SELECT s.Residential_ID,
            COALESCE(SUM(ss.Size), 0) AS TotalCapacity
@@ -33,7 +32,6 @@ if ($collegeRes && $collegeRes->num_rows > 0) {
     $residentialID = $cr['Residential_ID'];
 }
 
-// Items currently stored (approved bookings) in the same residential college
 $storageUsed = 0;
 if ($residentialID) {
     $usedRes = $conn->query("
@@ -47,22 +45,46 @@ if ($residentialID) {
     if ($usedRes) $storageUsed = (int)$usedRes->fetch_assoc()['used'];
 }
 
-$storagePct          = ($storageTotal > 0) ? round(($storageUsed / $storageTotal) * 100) : 0;
-$needsManualApproval = ($storagePct >= 60);
+$storagePct = ($storageTotal > 0) ? round(($storageUsed / $storageTotal) * 100) : 0;
 
 // ── Handle POST ───────────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Approve — only allowed when storage >= 60% (manual mode)
-    if (isset($_POST['approve']) && $needsManualApproval) {
+    // Approve — every pending booking now requires manual staff review
+    if (isset($_POST['approve'])) {
         $stmt = $conn->prepare("UPDATE booking SET Booking_Status = 'Approved' WHERE Booking_ID = ? AND LOWER(Booking_Status) = 'pending'");
         $stmt->bind_param("i", $bid); $stmt->execute(); $stmt->close();
         header("Location: staffBookingDetail.php?id=$bid&msg=approved"); exit();
     }
-    // Reject — only allowed when storage >= 60% (manual mode)
-    if (isset($_POST['reject']) && $needsManualApproval) {
+    // Reject — a reason AND an evidence photo are now mandatory, both shown to the student
+    if (isset($_POST['reject'])) {
         $reason = trim($_POST['reject_reason'] ?? '');
-        $stmt = $conn->prepare("UPDATE booking SET Booking_Status = 'Rejected' WHERE Booking_ID = ? AND LOWER(Booking_Status) = 'pending'");
-        $stmt->bind_param("i", $bid); $stmt->execute(); $stmt->close();
+
+        if ($reason === '') {
+            header("Location: staffBookingDetail.php?id=$bid&msg=reject_no_reason"); exit();
+        }
+
+        $photoUploaded = isset($_FILES['reject_photo']) && $_FILES['reject_photo']['error'] === 0;
+        if (!$photoUploaded) {
+            header("Location: staffBookingDetail.php?id=$bid&msg=reject_no_photo"); exit();
+        }
+
+        $ext     = strtolower(pathinfo($_FILES['reject_photo']['name'], PATHINFO_EXTENSION));
+        $allowed = ['jpg','jpeg','png','gif','webp'];
+        if (!in_array($ext, $allowed)) {
+            header("Location: staffBookingDetail.php?id=$bid&msg=reject_bad_photo"); exit();
+        }
+
+        $uploadDir = 'uploads/rejections/';
+        if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+        $filename = 'reject_' . $bid . '_' . time() . '.' . $ext;
+
+        if (!move_uploaded_file($_FILES['reject_photo']['tmp_name'], $uploadDir . $filename)) {
+            header("Location: staffBookingDetail.php?id=$bid&msg=reject_bad_photo"); exit();
+        }
+        $photoPath = $uploadDir . $filename;
+
+        $stmt = $conn->prepare("UPDATE booking SET Booking_Status = 'Rejected', Rejection_Reason = ?, Rejection_Photo = ? WHERE Booking_ID = ? AND LOWER(Booking_Status) = 'pending'");
+        $stmt->bind_param("ssi", $reason, $photoPath, $bid); $stmt->execute(); $stmt->close();
         header("Location: staffBookingDetail.php?id=$bid&msg=rejected"); exit();
     }
     // Verify (send to student) — requires drop-off photo first
@@ -293,8 +315,20 @@ $conn->close();
         .modal-box { background: #f1f0ea; color: #1e1b4b; border-radius: 20px; padding: 28px; width: 90%; max-width: 400px; }
         .modal-box h3 { margin-bottom: 12px; }
         .modal-box textarea { width: 100%; border-radius: 10px; border: 1px solid #ccc; padding: 10px; font-size: 0.9rem; resize: vertical; min-height: 80px; font-family: inherit; }
+        .modal-box .required-note { font-size: 0.75rem; color: #dc3545; margin-top: 6px; }
         .modal-btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; }
         .btn-cancel-modal { background: none; border: 1px solid #ccc; color: #666; padding: 8px 18px; border-radius: 20px; cursor: pointer; font-family: inherit; }
+
+        .capacity-info {
+            width: 97%;
+            background: rgba(124,92,252,0.08);
+            border: 1px solid rgba(124,92,252,0.25);
+            border-radius: 14px;
+            padding: 12px 18px;
+            margin-bottom: 14px;
+            font-size: 0.82rem;
+            color: #E8E9DE;
+        }
 
         #profileContainer { position: relative; display: inline-block; cursor: pointer; }
         #userImage { vertical-align: middle; margin-left: 5px; }
@@ -343,7 +377,10 @@ $conn->close();
             <?php
                 $msgs = [
                     'approved' => ' Booking approved.',
-                    'rejected' => ' Booking rejected.',
+                    'rejected' => ' Booking rejected. The student can now see your reason and evidence photo on their dashboard.',
+                    'reject_no_reason' => 'You must provide a reason before rejecting this booking.',
+                    'reject_no_photo'  => 'You must upload an evidence photo (e.g. the item next to a measuring tape) before rejecting this booking.',
+                    'reject_bad_photo' => 'That photo could not be uploaded. Please use a JPG, PNG, GIF, or WEBP file and try again.',
                     'verified' => ' Verification request sent to student.',
                     'uploaded'      => 'Drop-off photo uploaded successfully.',
                     'photo_cleared' => 'Photo removed successfully.',
@@ -416,6 +453,20 @@ $conn->close();
                     <span class="field-label">Total Fee</span>
                     <span class="field-value">RM <?php echo number_format((float)$b['TotalFee'], 2); ?></span>
                 </div>
+                <?php if ($bstat === 'rejected' && !empty($b['Rejection_Reason'])): ?>
+                <div class="field-row">
+                    <span class="field-label">Rejection Reason</span>
+                    <span class="field-value" style="color:#f8a5ad;"><?php echo htmlspecialchars($b['Rejection_Reason']); ?></span>
+                </div>
+                <?php endif; ?>
+                <?php if ($bstat === 'rejected' && !empty($b['Rejection_Photo'])): ?>
+                <div class="field-row" style="align-items:flex-start;">
+                    <span class="field-label">Evidence Photo</span>
+                    <span class="field-value">
+                        <img src="<?php echo htmlspecialchars($b['Rejection_Photo']); ?>" alt="Rejection evidence" style="max-width:240px; border-radius:10px; display:block; margin-top:4px;">
+                    </span>
+                </div>
+                <?php endif; ?>
                 <?php if ($iRes && $iRes->num_rows > 0): ?>
                 <table class="items-table" style="margin-top:14px;">
                     <thead><tr><th>Item</th><th>Qty</th><th>Price (RM)</th><th>Subtotal</th></tr></thead>
@@ -547,27 +598,18 @@ $conn->close();
         </div>
 
         <!-- ── Action buttons ── -->
-        <div class="action-row">
-            <?php if ($bstat === 'pending' && $needsManualApproval): ?>
-                <!-- Storage >= 60%: staff must manually approve or reject -->
-                <div style="width:97%; background:rgba(245,158,11,0.10); border:1px solid rgba(245,158,11,0.35); border-radius:14px; padding:14px 18px; margin-bottom:14px; font-size:0.85rem; color:#E8E9DE;">
-                     Storage is at <strong style="color:#f59e0b;"><?php echo $storagePct; ?>%</strong> capacity (≥60%).
-                    Manual approval is required for this booking.
-                </div>
-                <form method="POST" style="display:inline">
-                    <button type="submit" name="approve" class="btn-approve"> Approve</button>
-                </form>
-                <button class="btn-reject" onclick="document.getElementById('rejectModal').classList.add('show')"> Reject</button>
-
-            <?php elseif ($bstat === 'pending' && !$needsManualApproval): ?>
-                <!-- Storage < 60%: auto-approved on payment, just show info -->
-                <div style="width:97%; background:rgba(34,197,94,0.08); border:1px solid rgba(34,197,94,0.25); border-radius:14px; padding:14px 18px; font-size:0.85rem; color:#E8E9DE;">
-                    ℹ Storage is at <strong style="color:#22c55e;"><?php echo $storagePct; ?>%</strong> capacity.
-                    This booking will be <strong>auto-approved</strong> once the student pays.
-                    No action needed from staff.
-                </div>
-            <?php endif; ?>
+        <?php if ($bstat === 'pending'): ?>
+        <div class="capacity-info">
+            Storage in this college is currently at <strong><?php echo $storagePct; ?>%</strong> capacity.
+            Every booking now requires manual review — please check the details above before deciding.
         </div>
+        <div class="action-row">
+            <form method="POST" style="display:inline">
+                <button type="submit" name="approve" class="btn-approve"> Approve</button>
+            </form>
+            <button class="btn-reject" onclick="document.getElementById('rejectModal').classList.add('show')"> Reject</button>
+        </div>
+        <?php endif; ?>
 
     </div>
 </div>
@@ -576,8 +618,18 @@ $conn->close();
 <div class="modal-overlay" id="rejectModal">
     <div class="modal-box">
         <h3>Reject Booking #<?php echo $bid; ?></h3>
-        <form method="POST">
-            <textarea name="reject_reason" placeholder="Reason (optional, shown to student)"></textarea>
+        <form method="POST" id="rejectForm" enctype="multipart/form-data">
+            <textarea name="reject_reason" id="reject_reason" placeholder="Explain why this booking is being rejected — the student will see this." required></textarea>
+            <p class="required-note">* A reason is required and will be shown to the student.</p>
+
+            <label for="reject_photo" class="upload-label" style="margin-top:10px; text-align:center;">
+                 Attach Evidence Photo
+            </label>
+            <input type="file" name="reject_photo" id="reject_photo" accept="image/*" required
+                   style="display:block; margin-top:10px; font-size:0.8rem;">
+            <p class="required-note">* A clear photo is required — e.g. the item placed next to a measuring tape,
+                so the mismatch is unambiguous and the student cannot dispute what was found.</p>
+
             <div class="modal-btns">
                 <button type="button" class="btn-cancel-modal"
                     onclick="document.getElementById('rejectModal').classList.remove('show')">Cancel</button>

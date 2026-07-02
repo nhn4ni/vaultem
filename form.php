@@ -17,11 +17,14 @@ if (!$conn) {
 $student_id   = $_SESSION['Student_ID'] ?? '';
 $studentIdEsc = mysqli_real_escape_string($conn, $student_id);
 
+require_once 'autoCancelExpired.php';
+autoCancelExpiredBookings($conn);
+
 // ── Block if student already has an active booking ────────────────────────────
 $activeChk = mysqli_query($conn, "
     SELECT COUNT(*) AS c FROM booking
     WHERE Student_ID = '$studentIdEsc'
-      AND LOWER(Booking_Status) NOT IN ('rejected', 'collected')
+      AND LOWER(Booking_Status) NOT IN ('rejected', 'collected', 'cancelled_unpaid')
       AND Pickup_Date >= CURDATE()
 ");
 $activeRow = mysqli_fetch_assoc($activeChk);
@@ -165,9 +168,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     mysqli_close($conn);
 
-    echo "<h2>Booking Successful!</h2>";
-    echo "<p>Your booking has been confirmed. Redirecting to payment...</p>";
-    echo "<meta http-equiv='refresh' content='3;URL=payment.php?booking_id=" . $booking_id . "&amount=" . $totalPrice . "'>";
+    header("Location: mainStatus.php?msg=booking_submitted");
     exit();
 }
 
@@ -662,15 +663,15 @@ mysqli_close($conn);
                         <div class="bagDropdown" id="bagDropdown">
                             <div class="bagOption">
                                 <span>Big Bag <span class="itemPrice">RM 7.00</span></span>
-                                <input type="number" id="bigBagQty" name="bigBagQty" value="0" min="0" max="3" max="3" oninput="calculateTotal(); checkItemLimit()">
+                                <input type="number" id="bigBagQty" name="bigBagQty" value="0" min="0" max="3" max="3" oninput="calculateTotal(); checkItemLimit(); saveDraft();">
                             </div>
                             <div class="bagOption">
                                 <span>Medium Bag <span class="itemPrice">RM 5.00</span></span>
-                                <input type="number" id="medBagQty" name="medBagQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit()">
+                                <input type="number" id="medBagQty" name="medBagQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit(); saveDraft();">
                             </div>
                             <div class="bagOption">
                                 <span>Small Bag <span class="itemPrice">RM 3.00</span></span>
-                                <input type="number" id="smallBagQty" name="smallBagQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit()">
+                                <input type="number" id="smallBagQty" name="smallBagQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit(); saveDraft();">
                             </div>
                         </div>
                     </div>
@@ -685,15 +686,15 @@ mysqli_close($conn);
                         <div class="bagDropdown" id="luggageDropdown">
                             <div class="bagOption">
                                 <span>Large Luggage <span class="itemPrice">RM 10.00</span></span>
-                                <input type="number" id="largeLugQty" name="largeLugQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit()">
+                                <input type="number" id="largeLugQty" name="largeLugQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit(); saveDraft();">
                             </div>
                             <div class="bagOption">
                                 <span>Medium Luggage <span class="itemPrice">RM 8.00</span></span>
-                                <input type="number" id="medLugQty" name="medLugQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit()">
+                                <input type="number" id="medLugQty" name="medLugQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit(); saveDraft();">
                             </div>
                             <div class="bagOption">
                                 <span>Small Luggage <span class="itemPrice">RM 6.00</span></span>
-                                <input type="number" id="smallLugQty" name="smallLugQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit()">
+                                <input type="number" id="smallLugQty" name="smallLugQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit(); saveDraft();">
                             </div>
                         </div>
                     </div>
@@ -708,15 +709,15 @@ mysqli_close($conn);
                         <div class="bagDropdown" id="boxDropdown">
                             <div class="bagOption">
                                 <span>Big Box <span class="itemPrice">RM 5.00</span></span>
-                                <input type="number" id="bigBoxQty" name="bigBoxQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit()">
+                                <input type="number" id="bigBoxQty" name="bigBoxQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit(); saveDraft();">
                             </div>
                             <div class="bagOption">
                                 <span>Medium Box <span class="itemPrice">RM 3.00</span></span>
-                                <input type="number" id="medBoxQty" name="medBoxQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit()">
+                                <input type="number" id="medBoxQty" name="medBoxQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit(); saveDraft();">
                             </div>
                             <div class="bagOption">
                                 <span>Small Box <span class="itemPrice">RM 2.00</span></span>
-                                <input type="number" id="smallBoxQty" name="smallBoxQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit()">
+                                <input type="number" id="smallBoxQty" name="smallBoxQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit(); saveDraft();">
                             </div>
                         </div>
                     </div>
@@ -729,7 +730,7 @@ mysqli_close($conn);
                         <span>Bucket/Pail</span>
                         <span class="itemPrice">RM 3.00 / item</span>
                     </div>
-                    <input id="bucketInput" type="number" name="bucketQty" min="0" max="3" value="0" oninput="calculateTotal(); checkItemLimit()">
+                    <input id="bucketInput" type="number" name="bucketQty" min="0" max="3" value="0" oninput="calculateTotal(); checkItemLimit(); saveDraft();">
                 </div>
 
                 <!-- Others -->
@@ -738,7 +739,7 @@ mysqli_close($conn);
                         <span>Others</span>
                         <span class="itemPrice">RM 5.00 / item</span>
                     </div>
-                    <input id="otherQty" type="number" name="otherQty" min="0" max="3" value="0" oninput="calculateTotal(); checkItemLimit()">
+                    <input id="otherQty" type="number" name="otherQty" min="0" max="3" value="0" oninput="calculateTotal(); checkItemLimit(); saveDraft();">
                 </div>
 
                 <!-- View size guide -->
@@ -761,12 +762,12 @@ mysqli_close($conn);
             <div class="rightFooterSection">
                 <div class="emergencySection">
                     <label>
-                        <input type="checkbox" id="emergencyCheckbox" onchange="calculateTotal(); checkItemLimit()">
+                        <input type="checkbox" id="emergencyCheckbox" onchange="calculateTotal(); checkItemLimit(); saveDraft();">
                         <span>Emergency</span>
                     </label>
                     <span class="emergencyNote">(+ RM10 for Emergency Booking)</span>
                 </div>
-                <button type="button" id="backBtn" onclick="window.location.href='mainStatus.php'">Cancel</button>
+                <button type="button" id="backBtn" onclick="clearDraft(); window.location.href='mainStatus.php'">Cancel</button>
                 <button type="submit" class="submitBtn">Submit</button>
             </div>
         </div>
@@ -793,6 +794,7 @@ mysqli_close($conn);
 
             initDates();
             initDropdowns();
+            loadDraft();
         });
 
         function getCollegeSpace(collegeName) {
@@ -903,6 +905,7 @@ mysqli_close($conn);
             button.classList.add('selectCollege');
             selectedCollegeName = collegeName;
             document.getElementById('residentialCollege').value = collegeId;
+            saveDraft();
         }
 
         const currentYear = new Date().getFullYear();
@@ -966,12 +969,17 @@ mysqli_close($conn);
             dropOffMonth.addEventListener('change', function () {
                 let selectedMonth = parseInt(dropOffMonth.value);
                 fillDaysFiltered(dropOffDay, selectedMonth, selectedMonth === todayMonth);
+                saveDraft();
             });
 
             pickupMonth.addEventListener('change', function () {
                 let selectedMonth = parseInt(pickupMonth.value);
                 fillDaysFiltered(pickupDay, selectedMonth, selectedMonth === todayMonth, true);
+                saveDraft();
             });
+
+            dropOffDay.addEventListener('change', saveDraft);
+            pickupDay.addEventListener('change', saveDraft);
         }
 
         function initDropdowns() {
@@ -989,6 +997,91 @@ mysqli_close($conn);
                     }
                 });
             });
+        }
+
+        // ── Draft persistence (sessionStorage) ─────────────────────────────
+        // Keeps the form filled in if the student navigates to size.php and back,
+        // whether that happens in the same tab or a new one. Cleared once the
+        // booking is actually submitted, or if the student cancels.
+        const DRAFT_KEY = 'vaultemBookingDraft';
+        const qtyFieldIds = [
+            'bigBagQty', 'medBagQty', 'smallBagQty',
+            'largeLugQty', 'medLugQty', 'smallLugQty',
+            'bigBoxQty', 'medBoxQty', 'smallBoxQty',
+            'bucketInput', 'otherQty'
+        ];
+
+        function saveDraft() {
+            const draft = {
+                collegeId:   document.getElementById('residentialCollege').value,
+                collegeName: selectedCollegeName,
+                dropOffMonth: dropOffMonth.value,
+                dropOffDay:   dropOffDay.value,
+                pickupMonth:  pickupMonth.value,
+                pickupDay:    pickupDay.value,
+                emergency:    document.getElementById('emergencyCheckbox').checked,
+                quantities:   {}
+            };
+            qtyFieldIds.forEach(id => {
+                draft.quantities[id] = document.getElementById(id).value;
+            });
+            try {
+                sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+            } catch (e) { /* storage unavailable — fail silently, not critical */ }
+        }
+
+        function clearDraft() {
+            try { sessionStorage.removeItem(DRAFT_KEY); } catch (e) {}
+        }
+
+        function loadDraft() {
+            let raw;
+            try { raw = sessionStorage.getItem(DRAFT_KEY); } catch (e) { return; }
+            if (!raw) return;
+
+            let draft;
+            try { draft = JSON.parse(raw); } catch (e) { return; }
+
+            // Restore quantities
+            qtyFieldIds.forEach(id => {
+                if (draft.quantities && draft.quantities[id] !== undefined) {
+                    document.getElementById(id).value = draft.quantities[id];
+                }
+            });
+
+            // Restore emergency checkbox
+            document.getElementById('emergencyCheckbox').checked = !!draft.emergency;
+
+            // Restore dates (set month first, which rebuilds the day options, then set day)
+            if (draft.dropOffMonth !== undefined && draft.dropOffMonth !== '') {
+                dropOffMonth.value = draft.dropOffMonth;
+                dropOffMonth.dispatchEvent(new Event('change'));
+                if (draft.dropOffDay) dropOffDay.value = draft.dropOffDay;
+            }
+            if (draft.pickupMonth !== undefined && draft.pickupMonth !== '') {
+                pickupMonth.value = draft.pickupMonth;
+                pickupMonth.dispatchEvent(new Event('change'));
+                if (draft.pickupDay) pickupDay.value = draft.pickupDay;
+            }
+
+            // Restore selected college (only if it's still available)
+            if (draft.collegeId && draft.collegeName) {
+                document.querySelectorAll('.collegeCard').forEach(function (card) {
+                    const name = card.querySelector('h3').textContent.trim();
+                    if (name === draft.collegeName) {
+                        const btn = card.querySelector('.selectBtn');
+                        if (btn && !btn.classList.contains('full')) {
+                            btn.textContent = "Selected";
+                            btn.classList.add('selectCollege');
+                            selectedCollegeName = draft.collegeName;
+                            document.getElementById('residentialCollege').value = draft.collegeId;
+                        }
+                    }
+                });
+            }
+
+            calculateTotal();
+            checkItemLimit();
         }
 
         function calculateTotal() {
@@ -1082,6 +1175,7 @@ mysqli_close($conn);
             }
 
             reduceCollegeSpace(selectedCollegeName, totalItems);
+            clearDraft();
             return true;
         }
     </script>

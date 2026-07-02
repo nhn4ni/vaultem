@@ -9,6 +9,9 @@ if (!isset($_SESSION['Staff_ID']) || $_SESSION['role'] !== 'staff') {
 $conn = new mysqli("localhost", "root", "", "utem_accommodation");
 if ($conn->connect_error) die("Connection Failed: " . $conn->connect_error);
 
+require_once 'autoCancelExpired.php';
+autoCancelExpiredBookings($conn);
+
 $staff_name = $_SESSION['Staff_Name'] ?? 'Staff';
 $PENALTY_RATE = 2.00;
 
@@ -213,6 +216,7 @@ $conn->close();
         .badge-approved  { background: #d4edda; color: #155724; }
         .badge-rejected  { background: #f8d7da; color: #721c24; }
         .badge-collected { background: #e2e3e5; color: #495057; }
+        .badge-cancelled { background: #e2e3e5; color: #495057; }
         .badge-other     { background: #cfe2ff; color: #084298; }
         .badge-paid      { background: #d4edda; color: #155724; }
         .badge-unpaid    { background: #f8d7da; color: #721c24; }
@@ -266,7 +270,7 @@ $conn->close();
             <!-- Status filters -->
             <div class="filter-bar">
                 <?php
-                $statuses = ['all'=>'All','pending'=>'Pending','approved'=>'Approved','rejected'=>'Rejected','collected'=>'Collected'];
+                $statuses = ['all'=>'All','pending'=>'Pending','approved'=>'Approved','rejected'=>'Rejected','cancelled_unpaid'=>'Cancelled (Unpaid)','collected'=>'Collected'];
                 foreach ($statuses as $sv => $sl):
                 ?>
                 <a href="?status=<?php echo $sv; ?>&date=<?php echo $filterDate; ?>&college=<?php echo urlencode($filterCollege); ?>&q=<?php echo urlencode($search); ?>"
@@ -350,11 +354,14 @@ $conn->close();
                         $isPaid  = in_array($ps, ['y','paid']);
                         $isLater = in_array($ps, ['p','pending']);
 
-                        if ($bs === 'pending')       $bBadge = 'badge-pending';
-                        elseif ($bs === 'approved')  $bBadge = 'badge-approved';
-                        elseif ($bs === 'rejected')  $bBadge = 'badge-rejected';
-                        elseif ($bs === 'collected') $bBadge = 'badge-collected';
-                        else                         $bBadge = 'badge-other';
+                        if ($bs === 'pending')            $bBadge = 'badge-pending';
+                        elseif ($bs === 'approved')       $bBadge = 'badge-approved';
+                        elseif ($bs === 'rejected')       $bBadge = 'badge-rejected';
+                        elseif ($bs === 'cancelled_unpaid') $bBadge = 'badge-cancelled';
+                        elseif ($bs === 'collected')      $bBadge = 'badge-collected';
+                        else                               $bBadge = 'badge-other';
+
+                        $statusLabel = ($bs === 'cancelled_unpaid') ? 'Cancelled (Unpaid)' : $row['Booking_Status'];
 
                         $pBadge = $isPaid ? 'badge-paid' : ($isLater ? 'badge-later' : 'badge-unpaid');
                         $pLabel = $isPaid ? 'Paid' : ($isLater ? 'Pay Later' : 'Unpaid');
@@ -368,7 +375,7 @@ $conn->close();
                     <td><?php echo htmlspecialchars($row['Student_ID']); ?></td>
                     <td><?php echo htmlspecialchars($row['Residential_Block'] ?? 'N/A'); ?></td>
                     <td>
-                        <span class="badge <?php echo $bBadge; ?>"><?php echo htmlspecialchars($row['Booking_Status']); ?></span>
+                        <span class="badge <?php echo $bBadge; ?>"><?php echo htmlspecialchars($statusLabel); ?></span>
                         <?php if ($isOverdueNow): ?>
                             <span class="overdue-text"><?php echo $daysOverdue; ?>d Overdue</span>
                         <?php endif; ?>
