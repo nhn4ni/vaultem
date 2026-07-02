@@ -17,14 +17,11 @@ if (!$conn) {
 $student_id   = $_SESSION['Student_ID'] ?? '';
 $studentIdEsc = mysqli_real_escape_string($conn, $student_id);
 
-require_once 'autoCancelExpired.php';
-autoCancelExpiredBookings($conn);
-
 // ── Block if student already has an active booking ────────────────────────────
 $activeChk = mysqli_query($conn, "
     SELECT COUNT(*) AS c FROM booking
     WHERE Student_ID = '$studentIdEsc'
-      AND LOWER(Booking_Status) NOT IN ('rejected', 'collected', 'cancelled_unpaid')
+      AND LOWER(Booking_Status) NOT IN ('rejected', 'collected')
       AND Pickup_Date >= CURDATE()
 ");
 $activeRow = mysqli_fetch_assoc($activeChk);
@@ -32,6 +29,34 @@ if ($activeRow['c'] > 0) {
     header("Location: mainStatus.php?msg=already_booked");
     exit();
 }
+
+// ── Check if booking window is open ───────────────────────────────────────────
+$windowRes = mysqli_query($conn, "
+    SELECT window_id, label, start_date, end_date
+    FROM booking_window
+    WHERE start_date <= CURDATE()
+      AND end_date   >= CURDATE()
+    ORDER BY start_date ASC
+");
+$activeWindows = [];
+while ($wRow = mysqli_fetch_assoc($windowRes)) {
+    $activeWindows[] = $wRow;
+}
+
+// Also fetch all future active windows so student knows upcoming dates
+$upcomingRes = mysqli_query($conn, "
+    SELECT label, start_date, end_date
+    FROM booking_window
+    WHERE start_date > CURDATE()
+    ORDER BY start_date ASC
+    LIMIT 3
+");
+$upcomingWindows = [];
+while ($uRow = mysqli_fetch_assoc($upcomingRes)) {
+    $upcomingWindows[] = $uRow;
+}
+
+$bookingOpen = !empty($activeWindows);
 
 $genderQuery = mysqli_query($conn, "SELECT Gender FROM student WHERE Student_ID = '$studentIdEsc'");
 $studentGender = 'M';
@@ -168,7 +193,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     mysqli_close($conn);
 
-    header("Location: mainStatus.php?msg=booking_submitted");
+    echo "<h2>Booking Successful!</h2>";
+    echo "<p>Your booking has been confirmed. Redirecting to payment...</p>";
+    echo "<meta http-equiv='refresh' content='3;URL=payment.php?booking_id=" . $booking_id . "&amount=" . $totalPrice . "'>";
     exit();
 }
 
@@ -185,7 +212,7 @@ mysqli_close($conn);
     <link rel="stylesheet" href="mobile.css" type="text/css">
     <style>
         * {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Courier New', Courier, monospace;
             box-sizing: border-box;
         }
 
@@ -445,26 +472,6 @@ mysqli_close($conn);
             font-size: 1rem;
         }
 
-        .sizeGuideLink {
-            margin-top: -15px;
-            margin-bottom: 30px;
-            text-align: right;
-        }
-
-        #sizeGuideBtn {
-            background-color: #241253;
-            color: #f1f0ea;
-            border: none;
-            border-radius: 25px;
-            padding: 10px 25px;
-            font-size: 1rem;
-            cursor: pointer;
-        }
-
-        #sizeGuideBtn:hover {
-            background-color: #3a1e7a;
-        }
-
         .feeFooter {
             position: fixed;
             bottom: 0;
@@ -582,6 +589,43 @@ mysqli_close($conn);
 
 <body>
 
+<?php if (!$bookingOpen): ?>
+<!-- ── Booking Closed Screen ── -->
+<div style="display:flex; height:100vh; width:100vw; overflow:hidden;">
+    <div class="leftcontainer">
+        <header>
+            <h1 onclick="window.location.href='mainStatus.php'" style="cursor:pointer;">VaulteM</h1>
+        </header>
+    </div>
+    <div class="rightcontainer" style="justify-content:center; padding:50px;">
+        <div style="max-width:500px;">
+            <h2 style="color:#E8E9DE; margin-bottom:10px;">Booking Unavailable</h2>
+            <p style="color:rgba(232,233,222,0.7); margin-bottom:24px; line-height:1.6;">
+                Student bookings are currently closed. The booking form is only available during scheduled periods set by staff.
+            </p>
+
+            <?php if (!empty($upcomingWindows)): ?>
+            <div style="background:rgba(124,92,252,0.12); border:1px solid rgba(124,92,252,0.3); border-radius:14px; padding:16px 18px; margin-bottom:20px;">
+                <p style="font-size:0.78rem; text-transform:uppercase; letter-spacing:0.5px; color:#b084ff; margin-bottom:10px; font-weight:700;">Upcoming Booking Periods</p>
+                <?php foreach ($upcomingWindows as $uw): ?>
+                <p style="font-size:0.88rem; color:#E8E9DE; margin:6px 0;">
+                    <strong><?php echo htmlspecialchars($uw['label']); ?></strong><br>
+                    <span style="color:rgba(232,233,222,0.6); font-size:0.82rem;">
+                        <?php echo date('d M Y', strtotime($uw['start_date'])); ?> — <?php echo date('d M Y', strtotime($uw['end_date'])); ?>
+                    </span>
+                </p>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
+
+            <a href="mainStatus.php" style="display:inline-block; background:#E8E9DE; color:#241253; padding:12px 28px; border-radius:20px; font-weight:bold; text-decoration:none; font-size:0.9rem;">
+                Back to Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+<?php else: ?>
+
     <form id="bookingForm" method="POST" action="<?php echo htmlspecialchars($_SERVER['PHP_SELF']); ?>" onsubmit="return submitBooking()">
 
         <div class="leftContainer">
@@ -663,15 +707,15 @@ mysqli_close($conn);
                         <div class="bagDropdown" id="bagDropdown">
                             <div class="bagOption">
                                 <span>Big Bag <span class="itemPrice">RM 7.00</span></span>
-                                <input type="number" id="bigBagQty" name="bigBagQty" value="0" min="0" max="3" max="3" oninput="calculateTotal(); checkItemLimit(); saveDraft();">
+                                <input type="number" id="bigBagQty" name="bigBagQty" value="0" min="0" max="3" max="3" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                             <div class="bagOption">
                                 <span>Medium Bag <span class="itemPrice">RM 5.00</span></span>
-                                <input type="number" id="medBagQty" name="medBagQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit(); saveDraft();">
+                                <input type="number" id="medBagQty" name="medBagQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                             <div class="bagOption">
                                 <span>Small Bag <span class="itemPrice">RM 3.00</span></span>
-                                <input type="number" id="smallBagQty" name="smallBagQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit(); saveDraft();">
+                                <input type="number" id="smallBagQty" name="smallBagQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                         </div>
                     </div>
@@ -686,15 +730,15 @@ mysqli_close($conn);
                         <div class="bagDropdown" id="luggageDropdown">
                             <div class="bagOption">
                                 <span>Large Luggage <span class="itemPrice">RM 10.00</span></span>
-                                <input type="number" id="largeLugQty" name="largeLugQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit(); saveDraft();">
+                                <input type="number" id="largeLugQty" name="largeLugQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                             <div class="bagOption">
                                 <span>Medium Luggage <span class="itemPrice">RM 8.00</span></span>
-                                <input type="number" id="medLugQty" name="medLugQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit(); saveDraft();">
+                                <input type="number" id="medLugQty" name="medLugQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                             <div class="bagOption">
                                 <span>Small Luggage <span class="itemPrice">RM 6.00</span></span>
-                                <input type="number" id="smallLugQty" name="smallLugQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit(); saveDraft();">
+                                <input type="number" id="smallLugQty" name="smallLugQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                         </div>
                     </div>
@@ -709,15 +753,15 @@ mysqli_close($conn);
                         <div class="bagDropdown" id="boxDropdown">
                             <div class="bagOption">
                                 <span>Big Box <span class="itemPrice">RM 5.00</span></span>
-                                <input type="number" id="bigBoxQty" name="bigBoxQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit(); saveDraft();">
+                                <input type="number" id="bigBoxQty" name="bigBoxQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                             <div class="bagOption">
                                 <span>Medium Box <span class="itemPrice">RM 3.00</span></span>
-                                <input type="number" id="medBoxQty" name="medBoxQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit(); saveDraft();">
+                                <input type="number" id="medBoxQty" name="medBoxQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                             <div class="bagOption">
                                 <span>Small Box <span class="itemPrice">RM 2.00</span></span>
-                                <input type="number" id="smallBoxQty" name="smallBoxQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit(); saveDraft();">
+                                <input type="number" id="smallBoxQty" name="smallBoxQty" value="0" min="0" max="3" oninput="calculateTotal(); checkItemLimit()">
                             </div>
                         </div>
                     </div>
@@ -730,7 +774,7 @@ mysqli_close($conn);
                         <span>Bucket/Pail</span>
                         <span class="itemPrice">RM 3.00 / item</span>
                     </div>
-                    <input id="bucketInput" type="number" name="bucketQty" min="0" max="3" value="0" oninput="calculateTotal(); checkItemLimit(); saveDraft();">
+                    <input id="bucketInput" type="number" name="bucketQty" min="0" max="3" value="0" oninput="calculateTotal(); checkItemLimit()">
                 </div>
 
                 <!-- Others -->
@@ -739,12 +783,7 @@ mysqli_close($conn);
                         <span>Others</span>
                         <span class="itemPrice">RM 5.00 / item</span>
                     </div>
-                    <input id="otherQty" type="number" name="otherQty" min="0" max="3" value="0" oninput="calculateTotal(); checkItemLimit(); saveDraft();">
-                </div>
-
-                <!-- View size guide -->
-                <div class="sizeGuideLink">
-                    <button type="button" id="sizeGuideBtn" onclick="window.open('size.php', '_blank')">View size guide &#8594;</button>
+                    <input id="otherQty" type="number" name="otherQty" min="0" max="3" value="0" oninput="calculateTotal(); checkItemLimit()">
                 </div>
 
                 <input type="hidden" id="dropOffDate" name="dropOffDate" value="">
@@ -762,12 +801,12 @@ mysqli_close($conn);
             <div class="rightFooterSection">
                 <div class="emergencySection">
                     <label>
-                        <input type="checkbox" id="emergencyCheckbox" onchange="calculateTotal(); checkItemLimit(); saveDraft();">
+                        <input type="checkbox" id="emergencyCheckbox" onchange="calculateTotal(); checkItemLimit()">
                         <span>Emergency</span>
                     </label>
                     <span class="emergencyNote">(+ RM10 for Emergency Booking)</span>
                 </div>
-                <button type="button" id="backBtn" onclick="clearDraft(); window.location.href='mainStatus.php'">Cancel</button>
+                <button type="button" id="backBtn" onclick="window.location.href='mainStatus.php'">Cancel</button>
                 <button type="submit" class="submitBtn">Submit</button>
             </div>
         </div>
@@ -794,7 +833,6 @@ mysqli_close($conn);
 
             initDates();
             initDropdowns();
-            loadDraft();
         });
 
         function getCollegeSpace(collegeName) {
@@ -905,7 +943,6 @@ mysqli_close($conn);
             button.classList.add('selectCollege');
             selectedCollegeName = collegeName;
             document.getElementById('residentialCollege').value = collegeId;
-            saveDraft();
         }
 
         const currentYear = new Date().getFullYear();
@@ -920,66 +957,107 @@ mysqli_close($conn);
             return new Date(currentYear, monthIndex + 1, 0).getDate();
         }
 
+        // ── Booking windows from PHP ──────────────────────────────────────────
+        const bookingWindows = <?php
+            echo json_encode(array_map(function($w) {
+                return ['start' => $w['start_date'], 'end' => $w['end_date']];
+            }, $activeWindows));
+        ?>;
+
+        // Get min and max allowed dates across all windows
+        function getWindowBounds() {
+            let minDate = null, maxDate = null;
+            bookingWindows.forEach(function(w) {
+                if (!minDate || w.start < minDate) minDate = w.start;
+                if (!maxDate || w.end   > maxDate) maxDate = w.end;
+            });
+            return { minDate, maxDate };
+        }
+
+        // Check if a given YYYY-MM-DD date falls in any window
+        function isDateAllowed(dateStr) {
+            return bookingWindows.some(w => dateStr >= w.start && dateStr <= w.end);
+        }
+
+        function padTwo(n) { return n < 10 ? '0' + n : '' + n; }
+
         function initDates() {
             const today      = new Date();
             const todayMonth = today.getMonth();
             const todayDay   = today.getDate();
+            const bounds     = getWindowBounds();
 
             const allMonths = ['January','February','March','April','May','June',
                                'July','August','September','October','November','December'];
 
-            dropOffMonth.innerHTML = '';
-            pickupMonth.innerHTML  = '';
+            // Parse window bounds
+            const minParts   = bounds.minDate.split('-');
+            const maxParts   = bounds.maxDate.split('-');
+            const winMinMonth = parseInt(minParts[1]) - 1; // 0-indexed
+            const winMinDay   = parseInt(minParts[2]);
+            const winMaxMonth = parseInt(maxParts[1]) - 1;
+            const winMaxDay   = parseInt(maxParts[2]);
 
-            for (let m = todayMonth; m < 12; m++) {
-                let opt1 = document.createElement('option');
-                opt1.value = m;
-                opt1.textContent = allMonths[m];
-                dropOffMonth.appendChild(opt1);
+            // Only show months within the window
+            function fillMonths(selectEl, isPickup) {
+                selectEl.innerHTML = '';
+                for (let m = winMinMonth; m <= winMaxMonth; m++) {
+                    // For drop-off: skip months fully before today
+                    const lastDayOfMonth = getDaysInMonth(m);
+                    const dateStr = `${currentYear}-${padTwo(m+1)}-${padTwo(lastDayOfMonth)}`;
+                    if (dateStr < today.toISOString().slice(0,10)) continue;
 
-                let opt2 = document.createElement('option');
-                opt2.value = m;
-                opt2.textContent = allMonths[m];
-                pickupMonth.appendChild(opt2);
+                    let opt = document.createElement('option');
+                    opt.value       = m;
+                    opt.textContent = allMonths[m];
+                    selectEl.appendChild(opt);
+                }
+                selectEl.selectedIndex = 0;
             }
 
-            dropOffMonth.selectedIndex = 0;
-            pickupMonth.selectedIndex  = 0;
+            function fillDaysFiltered(selectElement, monthIndex, isPickup) {
+                selectElement.innerHTML = '';
+                const totalDays = getDaysInMonth(monthIndex);
 
-            function fillDaysFiltered(selectElement, monthIndex, restrictToToday, isPickup) {
-                let totalDays = getDaysInMonth(monthIndex);
-                let startDay  = 1;
-
-                if (restrictToToday && monthIndex === todayMonth) {
+                // Start day: today or tomorrow (for pickup), but not before window start
+                let startDay = 1;
+                if (monthIndex === todayMonth) {
                     startDay = isPickup ? todayDay + 1 : todayDay;
                 }
+                // Don't go before window start day if in window's first month
+                if (monthIndex === winMinMonth && winMinDay > startDay) {
+                    startDay = winMinDay;
+                }
 
-                selectElement.innerHTML = '';
-                for (let i = startDay; i <= totalDays; i++) {
+                // End day: don't exceed window end day if in window's last month
+                let endDay = totalDays;
+                if (monthIndex === winMaxMonth && winMaxDay < endDay) {
+                    endDay = winMaxDay;
+                }
+
+                for (let i = startDay; i <= endDay; i++) {
+                    const dateStr = `${currentYear}-${padTwo(monthIndex+1)}-${padTwo(i)}`;
+                    if (!isDateAllowed(dateStr)) continue;
                     let opt = document.createElement('option');
-                    opt.value       = i < 10 ? '0' + i : '' + i;
+                    opt.value       = padTwo(i);
                     opt.textContent = i;
                     selectElement.appendChild(opt);
                 }
             }
 
-            fillDaysFiltered(dropOffDay, todayMonth, true);
-            fillDaysFiltered(pickupDay,  todayMonth, true, true);
+            fillMonths(dropOffMonth, false);
+            fillMonths(pickupMonth,  true);
+
+            fillDaysFiltered(dropOffDay, parseInt(dropOffMonth.value || winMinMonth), false);
+            fillDaysFiltered(pickupDay,  parseInt(pickupMonth.value  || winMinMonth), true);
 
             dropOffMonth.addEventListener('change', function () {
-                let selectedMonth = parseInt(dropOffMonth.value);
-                fillDaysFiltered(dropOffDay, selectedMonth, selectedMonth === todayMonth);
-                saveDraft();
+                fillDaysFiltered(dropOffDay, parseInt(this.value), false);
             });
 
             pickupMonth.addEventListener('change', function () {
-                let selectedMonth = parseInt(pickupMonth.value);
-                fillDaysFiltered(pickupDay, selectedMonth, selectedMonth === todayMonth, true);
-                saveDraft();
+                fillDaysFiltered(pickupDay, parseInt(this.value), true);
             });
-
-            dropOffDay.addEventListener('change', saveDraft);
-            pickupDay.addEventListener('change', saveDraft);
         }
 
         function initDropdowns() {
@@ -997,91 +1075,6 @@ mysqli_close($conn);
                     }
                 });
             });
-        }
-
-        // ── Draft persistence (sessionStorage) ─────────────────────────────
-        // Keeps the form filled in if the student navigates to size.php and back,
-        // whether that happens in the same tab or a new one. Cleared once the
-        // booking is actually submitted, or if the student cancels.
-        const DRAFT_KEY = 'vaultemBookingDraft';
-        const qtyFieldIds = [
-            'bigBagQty', 'medBagQty', 'smallBagQty',
-            'largeLugQty', 'medLugQty', 'smallLugQty',
-            'bigBoxQty', 'medBoxQty', 'smallBoxQty',
-            'bucketInput', 'otherQty'
-        ];
-
-        function saveDraft() {
-            const draft = {
-                collegeId:   document.getElementById('residentialCollege').value,
-                collegeName: selectedCollegeName,
-                dropOffMonth: dropOffMonth.value,
-                dropOffDay:   dropOffDay.value,
-                pickupMonth:  pickupMonth.value,
-                pickupDay:    pickupDay.value,
-                emergency:    document.getElementById('emergencyCheckbox').checked,
-                quantities:   {}
-            };
-            qtyFieldIds.forEach(id => {
-                draft.quantities[id] = document.getElementById(id).value;
-            });
-            try {
-                sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-            } catch (e) { /* storage unavailable — fail silently, not critical */ }
-        }
-
-        function clearDraft() {
-            try { sessionStorage.removeItem(DRAFT_KEY); } catch (e) {}
-        }
-
-        function loadDraft() {
-            let raw;
-            try { raw = sessionStorage.getItem(DRAFT_KEY); } catch (e) { return; }
-            if (!raw) return;
-
-            let draft;
-            try { draft = JSON.parse(raw); } catch (e) { return; }
-
-            // Restore quantities
-            qtyFieldIds.forEach(id => {
-                if (draft.quantities && draft.quantities[id] !== undefined) {
-                    document.getElementById(id).value = draft.quantities[id];
-                }
-            });
-
-            // Restore emergency checkbox
-            document.getElementById('emergencyCheckbox').checked = !!draft.emergency;
-
-            // Restore dates (set month first, which rebuilds the day options, then set day)
-            if (draft.dropOffMonth !== undefined && draft.dropOffMonth !== '') {
-                dropOffMonth.value = draft.dropOffMonth;
-                dropOffMonth.dispatchEvent(new Event('change'));
-                if (draft.dropOffDay) dropOffDay.value = draft.dropOffDay;
-            }
-            if (draft.pickupMonth !== undefined && draft.pickupMonth !== '') {
-                pickupMonth.value = draft.pickupMonth;
-                pickupMonth.dispatchEvent(new Event('change'));
-                if (draft.pickupDay) pickupDay.value = draft.pickupDay;
-            }
-
-            // Restore selected college (only if it's still available)
-            if (draft.collegeId && draft.collegeName) {
-                document.querySelectorAll('.collegeCard').forEach(function (card) {
-                    const name = card.querySelector('h3').textContent.trim();
-                    if (name === draft.collegeName) {
-                        const btn = card.querySelector('.selectBtn');
-                        if (btn && !btn.classList.contains('full')) {
-                            btn.textContent = "Selected";
-                            btn.classList.add('selectCollege');
-                            selectedCollegeName = draft.collegeName;
-                            document.getElementById('residentialCollege').value = draft.collegeId;
-                        }
-                    }
-                });
-            }
-
-            calculateTotal();
-            checkItemLimit();
         }
 
         function calculateTotal() {
@@ -1175,9 +1168,31 @@ mysqli_close($conn);
             }
 
             reduceCollegeSpace(selectedCollegeName, totalItems);
-            clearDraft();
             return true;
         }
     </script>
+
+    <script>
+        // ── Restrict dates to active booking windows ──────────────────────────
+        // Window date validation is now handled inside initDates() above.
+        // This block only handles final submit validation.
+
+        const origSubmit = window.submitBooking;
+        window.submitBooking = function() {
+            const dropOff = document.getElementById('dropOffDate')?.value;
+            const pickup  = document.getElementById('pickupDate')?.value;
+            if (dropOff && !isDateAllowed(dropOff)) {
+                alert('Selected drop-off date is outside the allowed booking period.');
+                return false;
+            }
+            if (pickup && !isDateAllowed(pickup)) {
+                alert('Selected pick-up date is outside the allowed booking period.');
+                return false;
+            }
+            return origSubmit ? origSubmit() : true;
+        };
+    </script>
+
+<?php endif; ?>
 </body>
 </html>

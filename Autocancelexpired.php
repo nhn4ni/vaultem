@@ -1,16 +1,5 @@
 <?php
-/**
- * Auto-cancels bookings that were Approved but never paid before their
- * chosen Drop-off Date, and restores the reserved storage units back
- * into storespace so other students can book that slot.
- *
- * Call this once, right after connecting to the database, on any page
- * that reads or displays booking data (student or staff side).
- *
- * Works with both mysqli OOP-style ($conn = new mysqli(...)) and
- * procedural-style (mysqli_connect(...)) connections, since both
- * return the same mysqli object under the hood.
- */
+
 function autoCancelExpiredBookings(mysqli $conn) {
     $expiredQuery = $conn->query("
         SELECT b.Booking_ID

@@ -279,8 +279,8 @@ $activeTab = $_GET['tab'] ?? 'pending';
         <header>
             <h1 onclick="window.location.href='staffMainStatus.php'" style="cursor:pointer;">VaulteM</h1>
         </header>
-        <button type="button" id="booking" onclick="window.location.href='staffbookingrecords.php'">
-            Manage Bookings
+        <button type="button" id="booking" onclick="window.location.href='staffBookingWindow.php'">
+            Manage Booking Form
         </button>
     </div>
 
