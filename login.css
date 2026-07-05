@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 *{
     font-family: 'Inter', sans-serif;
-    
+    box-sizing: border-box;
 }
 
 body {
@@ -78,6 +78,7 @@ p{
 .rightcontainer input,.rightcontainer select{
     display: block;
     width: 100%;
+    box-sizing: border-box;
     background-color: #e8e9deb9;
     border: 20px;
     padding-right: 15px;
@@ -169,9 +170,11 @@ p{
 
 .password-box input{
     width: 100%;
+    box-sizing: border-box;
     display: block;
     padding: 15px 50px 15px 15px;
     margin-bottom: 0;
+    border-radius: 20px;
 }
 .password-box i{
     position: absolute;
