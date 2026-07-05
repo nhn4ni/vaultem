@@ -76,19 +76,14 @@ function bookingQuery(mysqli $conn, array $statuses, string $order = "b.Booking_
         SELECT b.Booking_ID, b.Booking_Status, b.DropOff_Date, b.Pickup_Date,
                b.Booking_Priority, b.Booking_Date,
                s.Student_Name, s.Student_ID, rc.Residential_Block,
-               COALESCE(SUM(i.Quantity), 0)           AS TotalItem,
-               COALESCE(SUM(i.Quantity * i.Price), 0) AS TotalFee,
-               p.Payment_Status,
-               p.Amount AS PaymentAmount
+               (SELECT COALESCE(SUM(i.Quantity), 0) FROM item i WHERE i.Booking_ID = b.Booking_ID)           AS TotalItem,
+               (SELECT COALESCE(SUM(i.Quantity * i.Price), 0) FROM item i WHERE i.Booking_ID = b.Booking_ID) AS TotalFee,
+               (SELECT Payment_Status FROM payment WHERE Booking_ID = b.Booking_ID LIMIT 1) AS Payment_Status,
+               (SELECT Amount FROM payment WHERE Booking_ID = b.Booking_ID LIMIT 1) AS PaymentAmount
         FROM booking b
         LEFT JOIN student s ON b.Student_ID = s.Student_ID
         LEFT JOIN residential_college rc ON s.Residential_ID = rc.Residential_ID
-        LEFT JOIN item i ON b.Booking_ID = i.Booking_ID
-        LEFT JOIN payment p ON b.Booking_ID = p.Booking_ID
         WHERE LOWER(b.Booking_Status) IN ($in)
-        GROUP BY b.Booking_ID, b.Booking_Status, b.DropOff_Date, b.Pickup_Date,
-                 b.Booking_Priority, b.Booking_Date, s.Student_Name, s.Student_ID,
-                 rc.Residential_Block, p.Payment_Status, p.Amount
         ORDER BY (b.Booking_Priority='Y') DESC, $order
     ");
 }

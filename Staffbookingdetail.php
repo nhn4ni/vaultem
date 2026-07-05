@@ -87,18 +87,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->bind_param("ssi", $reason, $photoPath, $bid); $stmt->execute(); $stmt->close();
         header("Location: staffBookingDetail.php?id=$bid&msg=rejected"); exit();
     }
-    // Verify (send to student) — requires drop-off photo first
+    // Confirm the uploaded drop-off photo is correct, then send it to the student for verification
+    if (isset($_POST['confirm_dropoff'])) {
+        $stmt = $conn->prepare("UPDATE booking SET Dropoff_Status = 'Pending' WHERE Booking_ID = ? AND Dropoff_Status = 'Uploaded'");
+        $stmt->bind_param("i", $bid); $stmt->execute(); $stmt->close();
+        header("Location: staffBookingDetail.php?id=$bid&msg=sent_to_student"); exit();
+    }
     if (isset($_POST['verify'])) {
-        $photoExists = !empty($_SESSION['dropoff_photo_' . $bid]);
-        if (!$photoExists) {
+        $confirmCheck = $conn->query("SELECT Dropoff_Status FROM booking WHERE Booking_ID = $bid LIMIT 1");
+        $confirmed    = $confirmCheck && $confirmCheck->num_rows > 0 && $confirmCheck->fetch_assoc()['Dropoff_Status'] === 'Confirmed';
+        if (!$confirmed) {
             header("Location: staffBookingDetail.php?id=$bid&msg=no_photo"); exit();
         }
         $stmt = $conn->prepare("UPDATE booking SET Booking_Status = 'Verification_Sent' WHERE Booking_ID = ? AND LOWER(Booking_Status) = 'approved'");
         $stmt->bind_param("i", $bid); $stmt->execute(); $stmt->close();
         header("Location: staffBookingDetail.php?id=$bid&msg=verified"); exit();
     }
-    // Drop-off photo upload
+    // Drop-off photo upload — only allowed once payment is completed
     if (isset($_POST['upload_dropoff'])) {
+        $payCheck = $conn->query("SELECT UPPER(Payment_Status) AS ps FROM payment WHERE Booking_ID = $bid LIMIT 1");
+        $paidNow  = $payCheck && $payCheck->num_rows > 0 && $payCheck->fetch_assoc()['ps'] === 'Y';
+
+        if (!$paidNow) {
+            header("Location: staffBookingDetail.php?id=$bid&msg=not_paid"); exit();
+        }
+
         if (isset($_FILES['dropoff_photo']) && $_FILES['dropoff_photo']['error'] === 0) {
             $ext     = strtolower(pathinfo($_FILES['dropoff_photo']['name'], PATHINFO_EXTENSION));
             $allowed = ['jpg','jpeg','png','gif','webp'];
@@ -107,7 +120,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
                 $filename = 'dropoff_' . $bid . '_' . time() . '.' . $ext;
                 if (move_uploaded_file($_FILES['dropoff_photo']['tmp_name'], $uploadDir . $filename)) {
-                    $_SESSION['dropoff_photo_' . $bid] = $uploadDir . $filename;
+                    $photoPath = $uploadDir . $filename;
+                    $stmt = $conn->prepare("UPDATE booking SET Dropoff_Photo = ?, Dropoff_Status = 'Uploaded' WHERE Booking_ID = ?");
+                    $stmt->bind_param("si", $photoPath, $bid);
+                    $stmt->execute();
+                    $stmt->close();
                 }
             }
         }
@@ -119,19 +136,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $bStmt = $conn->prepare("
     SELECT b.*, s.Student_Name, s.Student_Mail, s.Student_PhoneNo,
            rc.Residential_Block,
-           COALESCE(SUM(i.Quantity), 0)           AS TotalItem,
-           COALESCE(SUM(i.Quantity * i.Price), 0) AS TotalFee,
+           (SELECT COALESCE(SUM(i.Quantity), 0) FROM item i WHERE i.Booking_ID = b.Booking_ID)            AS TotalItem,
+           (SELECT COALESCE(SUM(i.Quantity * i.Price), 0) FROM item i WHERE i.Booking_ID = b.Booking_ID)  AS TotalFee,
            p.Payment_Status, p.Payment_Method, p.Payment_Date, p.Amount
     FROM booking b
     LEFT JOIN student s  ON b.Student_ID      = s.Student_ID
     LEFT JOIN residential_college rc ON s.Residential_ID = rc.Residential_ID
-    LEFT JOIN item i     ON b.Booking_ID      = i.Booking_ID
-    LEFT JOIN payment p  ON b.Booking_ID      = p.Booking_ID
+    LEFT JOIN (SELECT * FROM payment WHERE Booking_ID = ? LIMIT 1) p ON b.Booking_ID = p.Booking_ID
     WHERE b.Booking_ID = ?
-    GROUP BY b.Booking_ID, s.Student_Name, s.Student_Mail, s.Student_PhoneNo,
-             rc.Residential_Block, p.Payment_Status, p.Payment_Method, p.Payment_Date, p.Amount
 ");
-$bStmt->bind_param("i", $bid);
+$bStmt->bind_param("ii", $bid, $bid);
 $bStmt->execute();
 $bRes = $bStmt->get_result();
 if ($bRes->num_rows === 0) { header("Location: staffMainStatus.php"); exit(); }
@@ -156,8 +170,9 @@ $bs               = $b['Booking_Status'];
 $studentConfirmed = in_array($bs, ['Confirmed','Collected']);
 $verifSent        = ($bs === 'Verification_Sent');
 
-// ── Uploaded photo (session) ──────────────────────────────────────────────────
-$uploadedPhoto = $_SESSION['dropoff_photo_' . $bid] ?? null;
+// ── Drop-off photo & verification status (from DB) ────────────────────────────
+$uploadedPhoto = $b['Dropoff_Photo'] ?? null;
+$dropoffStatus = $b['Dropoff_Status'] ?? null; // null | 'Pending' | 'Confirmed' | 'Rejected'
 
 $conn->close();
 ?>
@@ -381,10 +396,12 @@ $conn->close();
                     'reject_no_reason' => 'You must provide a reason before rejecting this booking.',
                     'reject_no_photo'  => 'You must upload an evidence photo (e.g. the item next to a measuring tape) before rejecting this booking.',
                     'reject_bad_photo' => 'That photo could not be uploaded. Please use a JPG, PNG, GIF, or WEBP file and try again.',
+                    'not_paid'  => 'The student has not paid yet. The drop-off photo can only be uploaded after payment is completed.',
+                    'sent_to_student' => 'Photo sent to student for verification.',
                     'verified' => ' Verification request sent to student.',
                     'uploaded'      => 'Drop-off photo uploaded successfully.',
                     'photo_cleared' => 'Photo removed successfully.',
-                    'no_photo'      => 'You must upload the drop-off photo before sending verification to the student.',
+                    'no_photo'      => 'The drop-off photo must be uploaded and confirmed by the student before sending verification.',
                 ];
                 echo $msgs[$_GET['msg']] ?? '';
             ?>
@@ -527,8 +544,16 @@ $conn->close();
                     <div class="verif-left">
                         <h5>Drop off</h5>
                         <p>Staff must upload student's items photo as proof.</p>
-                        <?php if ($uploadedPhoto): ?>
-                            <p style="color:#22c55e; font-size:0.78rem; margin-top:6px; font-weight:600;"> Photo uploaded</p>
+                        <?php if ($dropoffStatus === 'Confirmed'): ?>
+                            <p style="color:#22c55e; font-size:0.78rem; margin-top:6px; font-weight:600;"> Confirmed by student — kept as reference until pickup.</p>
+                        <?php elseif ($dropoffStatus === 'Rejected'): ?>
+                            <p style="color:#dc3545; font-size:0.78rem; margin-top:6px; font-weight:600;"> Student says this is not their item. Please recheck and re-upload.</p>
+                        <?php elseif ($dropoffStatus === 'Pending'): ?>
+                            <p style="color:#f59e0b; font-size:0.78rem; margin-top:6px; font-weight:600;"> Awaiting student verification.</p>
+                        <?php elseif ($dropoffStatus === 'Uploaded'): ?>
+                            <p style="color:#cfe2ff; font-size:0.78rem; margin-top:6px; font-weight:600;"> Photo uploaded. Review it, then send to the student.</p>
+                        <?php elseif (!$isPaid): ?>
+                            <p style="color:#8b82b5; font-size:0.78rem; margin-top:6px; font-style:italic;">Upload is available once the student has paid.</p>
                         <?php endif; ?>
                     </div>
                     <div class="verif-right">
@@ -540,17 +565,36 @@ $conn->close();
                                 <br>No photo yet
                             <?php endif; ?>
                         </div>
-                        <!-- Upload form -->
-                        <form method="POST" enctype="multipart/form-data" style="display:inline;">
-                            <input type="hidden" name="upload_dropoff" value="1">
-                            <input type="file" name="dropoff_photo"
-                                   id="dropoff-file-<?php echo $bid; ?>"
-                                   accept="image/*" style="display:none;"
-                                   onchange="previewPhoto(this, <?php echo $bid; ?>); this.form.submit();">
-                            <label for="dropoff-file-<?php echo $bid; ?>" class="upload-label">
-                                 Upload Photo
-                            </label>
-                        </form>
+
+                        <?php if ($dropoffStatus === 'Uploaded'): ?>
+                            <!-- Staff reviews the photo, then confirms it's correct to send to student -->
+                            <form method="POST" style="display:inline;">
+                                <button type="submit" name="confirm_dropoff" class="verify-btn"
+                                    onclick="return confirm('Send this photo to the student for verification?')">
+                                     Send to Student
+                                </button>
+                            </form>
+                        <?php endif; ?>
+
+                        <!-- Upload form: hidden once confirmed, otherwise requires payment first -->
+                        <?php if ($dropoffStatus !== 'Confirmed'): ?>
+                            <?php if ($isPaid): ?>
+                            <form method="POST" enctype="multipart/form-data" style="display:inline;">
+                                <input type="hidden" name="upload_dropoff" value="1">
+                                <input type="file" name="dropoff_photo"
+                                       id="dropoff-file-<?php echo $bid; ?>"
+                                       accept="image/*" style="display:none;"
+                                       onchange="previewPhoto(this, <?php echo $bid; ?>); this.form.submit();">
+                                <label for="dropoff-file-<?php echo $bid; ?>" class="upload-label">
+                                     <?php echo $dropoffStatus === 'Rejected' ? 'Re-upload Photo' : ($dropoffStatus === 'Uploaded' ? 'Re-upload' : 'Upload Photo'); ?>
+                                </label>
+                            </form>
+                            <?php else: ?>
+                                <button class="upload-label" disabled style="opacity:0.5; cursor:not-allowed; border:none;" title="Student must pay first">
+                                    Upload Photo
+                                </button>
+                            <?php endif; ?>
+                        <?php endif; ?>
                     </div>
                 </div>
 
@@ -572,19 +616,24 @@ $conn->close();
                             <span class="confirmed-tag">Student Confirmed</span>
                         <?php elseif ($verifSent): ?>
                             <span class="sent-tag">Awaiting Student</span>
-                        <?php elseif ($bstat === 'approved' && $uploadedPhoto): ?>
+                        <?php elseif ($bstat === 'approved' && $dropoffStatus === 'Confirmed'): ?>
                             <form method="POST" style="display:inline;">
                                 <button type="submit" name="verify" class="verify-btn"
                                     onclick="return confirm('Send verification request to student for Booking #<?php echo $bid; ?>?')">
                                     Verify
                                 </button>
                             </form>
-                        <?php elseif ($bstat === 'approved' && !$uploadedPhoto): ?>
-                            <button class="verify-btn" disabled title="Upload drop-off photo first">
+                        <?php elseif ($bstat === 'approved' && $dropoffStatus !== 'Confirmed'): ?>
+                            <button class="verify-btn" disabled title="Drop-off photo must be confirmed by the student first">
                                 Verify
                             </button>
                             <p style="font-size:0.72rem; color:#f59e0b; text-align:right; margin-top:4px;">
-                                Upload drop-off photo first
+                                <?php
+                                    if ($dropoffStatus === 'Uploaded') echo 'Send the photo to the student first';
+                                    elseif ($dropoffStatus === 'Pending') echo 'Waiting for student to confirm drop-off photo';
+                                    elseif ($dropoffStatus === 'Rejected') echo 'Student rejected the photo — re-upload and resend';
+                                    else echo 'Upload drop-off photo first';
+                                ?>
                             </p>
                         <?php else: ?>
                             <button class="verify-btn" disabled title="Booking must be Approved first">

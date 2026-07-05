@@ -92,6 +92,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_booking_id']))
     $verifyStmt->close();
 }
 
+// ── Handle Drop-off Photo Confirmation (student verifies staff's uploaded photo) ──
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dropoff_confirm_id'])) {
+    $confirmID = intval($_POST['dropoff_confirm_id']);
+    $decision  = ($_POST['dropoff_decision'] ?? '') === 'yes' ? 'Confirmed' : 'Rejected';
+    $student_id = $_SESSION['Student_ID'];
+
+    $stmt = $conn->prepare("UPDATE booking SET Dropoff_Status = ? WHERE Booking_ID = ? AND Student_ID = ? AND Dropoff_Status = 'Pending'");
+    $stmt->bind_param("sis", $decision, $confirmID, $student_id);
+    $stmt->execute();
+    $stmt->close();
+
+    header("Location: mainStatus.php" . (isset($_GET['sort']) ? "?sort=" . $_GET['sort'] : ""));
+    exit();
+}
+
 // ── Student ID (needed for all queries below) ─────────────────────────────────
 $student_id   = $_SESSION['Student_ID'];
 $studentIdEsc = $conn->real_escape_string($student_id);
@@ -120,6 +135,8 @@ $sql = "
         b.Booking_Priority,
         b.Rejection_Reason,
         b.Rejection_Photo,
+        b.Dropoff_Photo,
+        b.Dropoff_Status,
         s.Student_Name,
         rc.Residential_Block,
         IFNULL((SELECT SUM(Quantity) FROM item WHERE Booking_ID = b.Booking_ID), 0) AS TotalItem,
@@ -133,6 +150,7 @@ $sql = "
     GROUP BY
         b.Booking_ID, b.DropOff_Date, b.Pickup_Date,
         b.Booking_Status, b.Booking_Priority, b.Rejection_Reason, b.Rejection_Photo,
+        b.Dropoff_Photo, b.Dropoff_Status,
         s.Student_Name, rc.Residential_Block
     ORDER BY b.Booking_ID $order
 ";
@@ -279,6 +297,38 @@ $result = $conn->query($sql);
             padding: 10px 14px;
             font-size: 0.85rem;
         }
+
+        /* ── Drop-off photo confirmation ── */
+        .dropoff-confirm-box {
+            margin-top: 10px;
+            background: #fff3cd;
+            border: 1px solid rgba(133,100,4,0.25);
+            border-radius: 10px;
+            padding: 12px 14px;
+        }
+        .dropoff-confirm-box p {
+            margin: 0 0 8px;
+            font-weight: 600;
+            color: #856404;
+            font-size: 0.85rem;
+        }
+        .dropoff-confirm-box img {
+            max-width: 220px;
+            border-radius: 10px;
+            display: block;
+            margin-bottom: 10px;
+        }
+        .confirm-yes-btn {
+            background-color: #4CAF50; color: white; border: none; border-radius: 15px;
+            padding: 8px 20px; font-weight: bold; cursor: pointer; font-size: 0.85rem;
+        }
+        .confirm-yes-btn:hover { background-color: #45a049; }
+        .confirm-no-btn {
+            background-color: #dc3545; color: white; border: none; border-radius: 15px;
+            padding: 8px 20px; font-weight: bold; cursor: pointer; font-size: 0.85rem;
+            margin-left: 8px;
+        }
+        .confirm-no-btn:hover { background-color: #bd2130; }
         
     </style>
 </head>
@@ -447,6 +497,33 @@ $result = $conn->query($sql);
                     <div class="cancelled-note">
                         <strong>Automatically Cancelled</strong> — payment wasn't completed before your chosen drop-off date, so this booking and its reserved slot were released.
                     </div>
+                <?php endif; ?>
+
+                <!-- Drop-off photo verification / proof -->
+                <?php if (!empty($row['Dropoff_Photo']) && ($row['Dropoff_Status'] ?? '') === 'Pending'): ?>
+                <div class="dropoff-confirm-box">
+                    <p>Staff has uploaded a photo of your dropped-off items. Is this yours?</p>
+                    <img src="<?php echo htmlspecialchars($row['Dropoff_Photo']); ?>" alt="Drop-off photo">
+                    <form method="POST" style="display:inline;">
+                        <input type="hidden" name="dropoff_confirm_id" value="<?php echo $bookingID; ?>">
+                        <input type="hidden" name="dropoff_decision" value="yes">
+                        <button type="submit" class="confirm-yes-btn">Yes, this is mine</button>
+                    </form>
+                    <form method="POST" style="display:inline;">
+                        <input type="hidden" name="dropoff_confirm_id" value="<?php echo $bookingID; ?>">
+                        <input type="hidden" name="dropoff_decision" value="no">
+                        <button type="submit" class="confirm-no-btn">No, not mine</button>
+                    </form>
+                </div>
+                <?php elseif (!empty($row['Dropoff_Photo']) && ($row['Dropoff_Status'] ?? '') === 'Confirmed'): ?>
+                <div class="dropoff-confirm-box" style="background:#d4edda; border-color:rgba(21,87,36,0.25);">
+                    <p style="color:#155724;"> You confirmed this is your item. Kept here as proof until pickup.</p>
+                    <img src="<?php echo htmlspecialchars($row['Dropoff_Photo']); ?>" alt="Drop-off photo">
+                </div>
+                <?php elseif (($row['Dropoff_Status'] ?? '') === 'Rejected'): ?>
+                <div class="dropoff-confirm-box" style="background:#f8d7da; border-color:rgba(114,28,36,0.25);">
+                    <p style="color:#721c24;">You reported a mismatch on the drop-off photo. Staff has been notified and will re-upload.</p>
+                </div>
                 <?php endif; ?>
 
                 <p class="pickup-note">

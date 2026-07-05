@@ -47,13 +47,13 @@ $overdueQuery = $conn->query("
         b.DropOff_Date,
         s.Student_Name,
         s.Student_ID,
-        DATEDIFF(CURDATE(), b.Pickup_Date) AS DaysOverdue,
+        GREATEST(1, CEIL(TIMESTAMPDIFF(SECOND, DATE_ADD(b.Pickup_Date, INTERVAL 11 HOUR), NOW()) / 86400)) AS DaysOverdue,
         COALESCE(SUM(i.Quantity), 0) AS TotalItems
     FROM booking b
     LEFT JOIN student s ON b.Student_ID = s.Student_ID
     LEFT JOIN item i    ON b.Booking_ID = i.Booking_ID
     WHERE LOWER(b.Booking_Status) = 'approved'
-      AND b.Pickup_Date < CURDATE()
+      AND DATE_ADD(b.Pickup_Date, INTERVAL 11 HOUR) < NOW()
     GROUP BY b.Booking_ID, b.Pickup_Date, b.DropOff_Date, s.Student_Name, s.Student_ID
     ORDER BY DaysOverdue DESC
 ");
