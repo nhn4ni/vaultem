@@ -21,7 +21,7 @@ $studentIdEsc = mysqli_real_escape_string($conn, $student_id);
 $activeChk = mysqli_query($conn, "
     SELECT COUNT(*) AS c FROM booking
     WHERE Student_ID = '$studentIdEsc'
-      AND LOWER(Booking_Status) NOT IN ('rejected', 'collected')
+      AND LOWER(Booking_Status) NOT IN ('rejected', 'collected', 'cancelled_unpaid')
       AND Pickup_Date >= CURDATE()
 ");
 $activeRow = mysqli_fetch_assoc($activeChk);

@@ -5,7 +5,7 @@ function autoCancelExpiredBookings(mysqli $conn) {
         SELECT b.Booking_ID
         FROM booking b
         LEFT JOIN payment p ON b.Booking_ID = p.Booking_ID
-        WHERE LOWER(b.Booking_Status) = 'approved'
+        WHERE LOWER(b.Booking_Status) IN ('approved', 'pending')
           AND b.DropOff_Date < CURDATE()
           AND (p.Payment_Status IS NULL OR UPPER(p.Payment_Status) != 'Y')
     ");
