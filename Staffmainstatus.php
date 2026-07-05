@@ -72,7 +72,8 @@ function bookingQuery(mysqli $conn, array $statuses, string $order = "b.Booking_
                s.Student_Name, s.Student_ID, rc.Residential_Block,
                COALESCE(SUM(i.Quantity), 0)           AS TotalItem,
                COALESCE(SUM(i.Quantity * i.Price), 0) AS TotalFee,
-               p.Payment_Status
+               p.Payment_Status,
+               p.Amount AS PaymentAmount
         FROM booking b
         LEFT JOIN student s ON b.Student_ID = s.Student_ID
         LEFT JOIN residential_college rc ON s.Residential_ID = rc.Residential_ID
@@ -81,13 +82,13 @@ function bookingQuery(mysqli $conn, array $statuses, string $order = "b.Booking_
         WHERE LOWER(b.Booking_Status) IN ($in)
         GROUP BY b.Booking_ID, b.Booking_Status, b.DropOff_Date, b.Pickup_Date,
                  b.Booking_Priority, b.Booking_Date, s.Student_Name, s.Student_ID,
-                 rc.Residential_Block, p.Payment_Status
+                 rc.Residential_Block, p.Payment_Status, p.Amount
         ORDER BY (b.Booking_Priority='Y') DESC, $order
     ");
 }
 
-// Pending — oldest first so longest waiting gets reviewed first
-$pendingQ   = bookingQuery($conn, ['pending'], 'b.Booking_ID ASC');
+// Pending — newest first
+$pendingQ   = bookingQuery($conn, ['pending'], 'b.Booking_ID DESC');
 // Approved — newest first
 $approvedQ  = bookingQuery($conn, ['approved','verification_sent','confirmed'], 'b.Booking_ID DESC');
 // Cancelled/rejected — oldest first (first out, stack at bottom)
@@ -390,6 +391,7 @@ $activeTab = $_GET['tab'] ?? 'pending';
             $isPrio = $row['Booking_Priority'] === 'Y';
             $ps     = strtolower($row['Payment_Status'] ?? '');
             $isPaid = ($ps === 'y' || $ps === 'paid');
+            $feeToShow = $row['PaymentAmount'] ?? $row['TotalFee'];
 
             if ($bsl === 'pending')               $sc = 'status-pending';
             elseif ($bsl === 'approved')          $sc = 'status-approved';
@@ -413,7 +415,7 @@ $activeTab = $_GET['tab'] ?? 'pending';
                     <p>Drop-off  : <?php echo date('d/m/Y', strtotime($row['DropOff_Date'])); ?></p>
                     <p>Pick-up   : <?php echo date('d/m/Y', strtotime($row['Pickup_Date'])); ?></p>
                     <p>Items     : <?php echo $row['TotalItem']; ?></p>
-                    <p>Total fee : RM <?php echo number_format((float)$row['TotalFee'], 2); ?></p>
+                    <p>Total fee : RM <?php echo number_format((float)$feeToShow, 2); ?></p>
                     <p>Payment   : <?php echo $isPaid ? '<strong style="color:#22c55e;">Paid</strong>' : '<span style="color:#856404;">Unpaid</span>'; ?></p>
                 </div>
                 <div class="button-container">
@@ -451,8 +453,9 @@ $activeTab = $_GET['tab'] ?? 'pending';
                 </thead>
                 <tbody>
                 <?php while ($row = $pendingQ->fetch_assoc()):
-                    $isPrio   = $row['Booking_Priority'] === 'Y';
-                    $waitDays = (int)floor((time() - strtotime($row['Booking_Date'])) / 86400);
+                    $isPrio    = $row['Booking_Priority'] === 'Y';
+                    $waitDays  = (int)floor((time() - strtotime($row['Booking_Date'])) / 86400);
+                    $feeToShow = $row['PaymentAmount'] ?? $row['TotalFee'];
                 ?>
                 <tr>
                     <td>
@@ -467,7 +470,7 @@ $activeTab = $_GET['tab'] ?? 'pending';
                     <td><?php echo date('d/m/Y', strtotime($row['DropOff_Date'])); ?></td>
                     <td><?php echo date('d/m/Y', strtotime($row['Pickup_Date'])); ?></td>
                     <td><?php echo $row['TotalItem']; ?></td>
-                    <td><?php echo number_format((float)$row['TotalFee'], 2); ?></td>
+                    <td><?php echo number_format((float)$feeToShow, 2); ?></td>
                     <td>
                         <?php echo date('d/m/Y', strtotime($row['Booking_Date'])); ?>
                         <span class="wait-days"><?php echo $waitDays === 0 ? 'Today' : $waitDays.'d ago'; ?></span>
