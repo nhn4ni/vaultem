@@ -87,8 +87,8 @@ function bookingQuery(mysqli $conn, array $statuses, string $order = "b.Booking_
     ");
 }
 
-// Pending — newest first
-$pendingQ   = bookingQuery($conn, ['pending'], 'b.Booking_ID DESC');
+// Pending — oldest first so longest waiting gets reviewed first
+$pendingQ   = bookingQuery($conn, ['pending'], 'b.Booking_ID ASC');
 // Approved — newest first
 $approvedQ  = bookingQuery($conn, ['approved','verification_sent','confirmed'], 'b.Booking_ID DESC');
 // Cancelled/rejected — oldest first (first out, stack at bottom)
