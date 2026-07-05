@@ -415,7 +415,7 @@ $result = $conn->query($sql);
                 <p>Pick-up date  : <?php echo htmlspecialchars($row['Pickup_Date']); ?></p>
                 <p>Item quantity : <?php echo htmlspecialchars($row['TotalItem'] ?? '0'); ?></p>
                 <p>College       : <?php echo htmlspecialchars($row['Residential_Block'] ?? 'N/A'); ?></p>
-                <p>Total fee     : RM <?php echo number_format((float)($row['TotalFee'] ?? 0), 2); ?></p>
+                <p>Total fee     : RM <?php echo number_format((float)$totalAmount, 2); ?></p>
                 <?php if ($paymentRow): ?>
                     <p>Payment status:
                         <?php

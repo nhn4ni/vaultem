@@ -168,18 +168,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         die("Payment insert failed: " . mysqli_error($conn));
     }
 
-    $items = [
-        ['name' => 'Big Bag',        'size' => 'L', 'qty' => $bigBagQty],
-        ['name' => 'Medium Bag',     'size' => 'M', 'qty' => $medBagQty],
-        ['name' => 'Small Bag',      'size' => 'S', 'qty' => $smallBagQty],
-        ['name' => 'Large Luggage',  'size' => 'L', 'qty' => $largeLugQty],
-        ['name' => 'Medium Luggage', 'size' => 'M', 'qty' => $medLugQty],
-        ['name' => 'Small Luggage',  'size' => 'S', 'qty' => $smallLugQty],
-        ['name' => 'Big Box',        'size' => 'L', 'qty' => $bigBoxQty],
-        ['name' => 'Medium Box',     'size' => 'M', 'qty' => $medBoxQty],
-        ['name' => 'Small Box',      'size' => 'S', 'qty' => $smallBoxQty],
-        ['name' => 'Bucket/Pail',    'size' => 'M', 'qty' => $bucketQty],
-        ['name' => 'Other',          'size' => 'M', 'qty' => $otherQty],
+        $items = [
+        ['name' => 'Big Bag',        'size' => 'L', 'qty' => $bigBagQty,   'price' => 7.00],
+        ['name' => 'Medium Bag',     'size' => 'M', 'qty' => $medBagQty,   'price' => 5.00],
+        ['name' => 'Small Bag',      'size' => 'S', 'qty' => $smallBagQty, 'price' => 3.00],
+        ['name' => 'Large Luggage',  'size' => 'L', 'qty' => $largeLugQty, 'price' => 10.00],
+        ['name' => 'Medium Luggage', 'size' => 'M', 'qty' => $medLugQty,   'price' => 8.00],
+        ['name' => 'Small Luggage',  'size' => 'S', 'qty' => $smallLugQty, 'price' => 6.00],
+        ['name' => 'Big Box',        'size' => 'L', 'qty' => $bigBoxQty,   'price' => 5.00],
+        ['name' => 'Medium Box',     'size' => 'M', 'qty' => $medBoxQty,   'price' => 3.00],
+        ['name' => 'Small Box',      'size' => 'S', 'qty' => $smallBoxQty, 'price' => 2.00],
+        ['name' => 'Bucket/Pail',    'size' => 'M', 'qty' => $bucketQty,   'price' => 3.00],
+        ['name' => 'Other',          'size' => 'M', 'qty' => $otherQty,    'price' => 5.00],
     ];
 
     foreach ($items as $item) {
@@ -187,7 +187,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $itemNameEsc = mysqli_real_escape_string($conn, $item['name']);
             $itemSizeEsc = mysqli_real_escape_string($conn, $item['size']);
             mysqli_query($conn, "INSERT INTO item (Item_Name, Item_Category, Item_Size, Quantity, Price, Space_ID, Booking_ID)
-                                 VALUES ('$itemNameEsc', 'Storage', '$itemSizeEsc', " . $item['qty'] . ", 0.50, $space_id, $booking_id)");
+                                VALUES ('$itemNameEsc', 'Storage', '$itemSizeEsc', " . $item['qty'] . ", " . $item['price'] . ", $space_id, $booking_id)");
         }
     }
 
