@@ -50,8 +50,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $rEsc = $conn->real_escape_string($reason);
         $pEsc = $conn->real_escape_string($proofPath);
-        $conn->query("UPDATE booking SET Booking_Status='Rejected', Reject_Reason='$rEsc', Reject_Photo='$pEsc', Seen_By_Student=0
+        $rejectResult = $conn->query("UPDATE booking SET Booking_Status='Rejected', Rejection_Reason='$rEsc', Rejection_Photo='$pEsc'
                       WHERE Booking_ID=$bid AND LOWER(Booking_Status)='pending'");
+        if (!$rejectResult) {
+            die("Reject UPDATE failed: " . $conn->error);
+        }
+        if ($conn->affected_rows === 0) {
+            die("Reject UPDATE ran but changed 0 rows. Booking_ID=$bid may not exist, or its Booking_Status is not 'pending'.");
+        }
         header("Location: staffMainStatus.php?tab=pending&msg=rejected&bid=$bid"); exit();
     }
 }
