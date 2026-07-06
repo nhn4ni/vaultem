@@ -12,6 +12,10 @@ if ($conn->connect_error) die("Connection Failed: " . $conn->connect_error);
 $staff_name = $_SESSION['Staff_Name'] ?? 'Staff';
 $bid = intval($_GET['id'] ?? 0);
 
+// ── Staff working hours: drop-off photo upload & pickup verify only allowed 8AM-11AM ──
+$currentTime         = date('H:i:s');
+$withinWorkingHours  = ($currentTime >= '08:00:00' && $currentTime <= '11:00:00');
+
 if (!$bid) { header("Location: staffMainStatus.php"); exit(); }
 
 // ── Storage capacity (informational only — no longer gates approval) ─────────
@@ -94,6 +98,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         header("Location: staffBookingDetail.php?id=$bid&msg=sent_to_student"); exit();
     }
     if (isset($_POST['verify'])) {
+        if (!$withinWorkingHours) {
+            header("Location: staffBookingDetail.php?id=$bid&msg=outside_hours"); exit();
+        }
         $confirmCheck = $conn->query("SELECT Dropoff_Status FROM booking WHERE Booking_ID = $bid LIMIT 1");
         $confirmed    = $confirmCheck && $confirmCheck->num_rows > 0 && $confirmCheck->fetch_assoc()['Dropoff_Status'] === 'Confirmed';
         if (!$confirmed) {
@@ -103,8 +110,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->bind_param("i", $bid); $stmt->execute(); $stmt->close();
         header("Location: staffBookingDetail.php?id=$bid&msg=verified"); exit();
     }
-    // Drop-off photo upload — only allowed once payment is completed
+    // Drop-off photo upload — only allowed once payment is completed, and only during working hours (8AM-11AM)
     if (isset($_POST['upload_dropoff'])) {
+        if (!$withinWorkingHours) {
+            header("Location: staffBookingDetail.php?id=$bid&msg=outside_hours"); exit();
+        }
         $payCheck = $conn->query("SELECT UPPER(Payment_Status) AS ps FROM payment WHERE Booking_ID = $bid LIMIT 1");
         $paidNow  = $payCheck && $payCheck->num_rows > 0 && $payCheck->fetch_assoc()['ps'] === 'Y';
 
@@ -398,6 +408,7 @@ $conn->close();
                     'reject_bad_photo' => 'That photo could not be uploaded. Please use a JPG, PNG, GIF, or WEBP file and try again.',
                     'not_paid'  => 'The student has not paid yet. The drop-off photo can only be uploaded after payment is completed.',
                     'sent_to_student' => 'Photo sent to student for verification.',
+                    'outside_hours' => 'This action is only available during working hours (8:00 AM - 11:00 AM).',
                     'verified' => ' Verification request sent to student.',
                     'uploaded'      => 'Drop-off photo uploaded successfully.',
                     'photo_cleared' => 'Photo removed successfully.',
@@ -571,14 +582,14 @@ $conn->close();
                             <form method="POST" style="display:inline;">
                                 <button type="submit" name="confirm_dropoff" class="verify-btn"
                                     onclick="return confirm('Send this photo to the student for verification?')">
-                                     Send to Student
+                                     Correct — Send to Student
                                 </button>
                             </form>
                         <?php endif; ?>
 
-                        <!-- Upload form: hidden once confirmed, otherwise requires payment first -->
+                        <!-- Upload form: hidden once confirmed, otherwise requires payment + working hours -->
                         <?php if ($dropoffStatus !== 'Confirmed'): ?>
-                            <?php if ($isPaid): ?>
+                            <?php if ($isPaid && $withinWorkingHours): ?>
                             <form method="POST" enctype="multipart/form-data" style="display:inline;">
                                 <input type="hidden" name="upload_dropoff" value="1">
                                 <input type="file" name="dropoff_photo"
@@ -589,8 +600,12 @@ $conn->close();
                                      <?php echo $dropoffStatus === 'Rejected' ? 'Re-upload Photo' : ($dropoffStatus === 'Uploaded' ? 'Re-upload' : 'Upload Photo'); ?>
                                 </label>
                             </form>
-                            <?php else: ?>
+                            <?php elseif (!$isPaid): ?>
                                 <button class="upload-label" disabled style="opacity:0.5; cursor:not-allowed; border:none;" title="Student must pay first">
+                                    Upload Photo
+                                </button>
+                            <?php else: ?>
+                                <button class="upload-label" disabled style="opacity:0.5; cursor:not-allowed; border:none;" title="Only available 8:00 AM - 11:00 AM">
                                     Upload Photo
                                 </button>
                             <?php endif; ?>
@@ -616,13 +631,20 @@ $conn->close();
                             <span class="confirmed-tag">Student Confirmed</span>
                         <?php elseif ($verifSent): ?>
                             <span class="sent-tag">Awaiting Student</span>
-                        <?php elseif ($bstat === 'approved' && $dropoffStatus === 'Confirmed'): ?>
+                        <?php elseif ($bstat === 'approved' && $dropoffStatus === 'Confirmed' && $withinWorkingHours): ?>
                             <form method="POST" style="display:inline;">
                                 <button type="submit" name="verify" class="verify-btn"
                                     onclick="return confirm('Send verification request to student for Booking #<?php echo $bid; ?>?')">
                                     Verify
                                 </button>
                             </form>
+                        <?php elseif ($bstat === 'approved' && $dropoffStatus === 'Confirmed' && !$withinWorkingHours): ?>
+                            <button class="verify-btn" disabled title="Only available 8:00 AM - 11:00 AM">
+                                Verify
+                            </button>
+                            <p style="font-size:0.72rem; color:#f59e0b; text-align:right; margin-top:4px;">
+                                Only available 8:00 AM - 11:00 AM
+                            </p>
                         <?php elseif ($bstat === 'approved' && $dropoffStatus !== 'Confirmed'): ?>
                             <button class="verify-btn" disabled title="Drop-off photo must be confirmed by the student first">
                                 Verify
