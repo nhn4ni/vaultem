@@ -22,7 +22,7 @@ $studentIdEsc = mysqli_real_escape_string($conn, $student_id);
 $activeChk = mysqli_query($conn, "
     SELECT COUNT(*) AS c FROM booking
     WHERE Student_ID = '$studentIdEsc'
-      AND LOWER(Booking_Status) NOT IN ('rejected', 'collected', 'cancelled_unpaid', 'cancelled', 'waived', 'settled')
+    AND LOWER(Booking_Status) NOT IN ('rejected', 'collected', 'cancelled_unpaid', 'cancelled', 'waived', 'settled')
 ");
 $activeRow = mysqli_fetch_assoc($activeChk);
 if ($activeRow['c'] > 0) {
@@ -35,7 +35,7 @@ $windowRes = mysqli_query($conn, "
     SELECT window_id, label, start_date, end_date
     FROM booking_window
     WHERE start_date <= CURDATE()
-      AND end_date   >= CURDATE()
+    AND end_date   >= CURDATE()
     ORDER BY start_date ASC
 ");
 $activeWindows = [];
@@ -70,9 +70,9 @@ if ($genderQuery && mysqli_num_rows($genderQuery) > 0) {
 
 $collegeQuery = "
     SELECT rc.Residential_ID,
-           rc.Residential_Block,
-           rc.Gender_Type,
-           COALESCE(ss.Size, 0) AS Available_Space
+        rc.Residential_Block,
+        rc.Gender_Type,
+        COALESCE(ss.Size, 0) AS Available_Space
     FROM residential_college rc
     LEFT JOIN storespace ss ON rc.Residential_ID = ss.Residential_ID
     WHERE rc.Gender_Type = '$studentGender'
@@ -172,7 +172,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     mysqli_stmt_close($deductSpace);
 
     if (!mysqli_query($conn, "INSERT INTO payment (Payment_Method, Payment_Status, Payment_Date, Amount, Booking_ID)
-                              VALUES ('Online', '$paymentStatus', CURDATE(), $totalPrice, $booking_id)")) {
+                            VALUES ('Online', '$paymentStatus', CURDATE(), $totalPrice, $booking_id)")) {
         die("Payment insert failed: " . mysqli_error($conn));
     }
 
