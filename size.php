@@ -163,12 +163,12 @@ session_start();
                 as defined in the tables below.
             </p>
             <p>
-                Staff will inspect and measure your item(s) upon drop-off and/or pickup. If the item you
+                Staff will inspect and measure your item(s) when reviewing your booking for approval. If the item you
                 present <strong>does not match the size declared</strong> during booking, this will be
-                treated as a <strong>false declaration</strong> and the following will apply:
+                treated as a <strong>mismatch</strong> and the following will apply:
             </p>
             <p>
-                &bull; A <strong>penalty fee</strong> will be charged based on the correct size category.<br>
+                &bull; Your booking may be <strong>rejected by staff</strong> — no penalty fee will be charged, and your item will not be accepted for storage.<br>
                 &bull; Repeated false declarations may result in <strong>suspension</strong> of your booking privileges.<br>
                 &bull; Staff decisions on size classification at the point of inspection are <strong>final</strong>.
             </p>
