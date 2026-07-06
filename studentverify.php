@@ -11,6 +11,7 @@ if ($conn->connect_error) die("Connection Failed: " . $conn->connect_error);
 
 $student_id   = $_SESSION['Student_ID'];
 $student_name = $_SESSION['Student_Name'] ?? 'Student';
+$studentIdEsc = $conn->real_escape_string($student_id);
 
 // ── Handle student confirmation ───────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_booking_id'])) {
@@ -26,19 +27,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['confirm_booking_id'])
     exit();
 }
 
+// ── Check if student has drop-off photos waiting elsewhere (on mainStatus.php) ──
+$dropoffPendingRes = $conn->query("
+    SELECT COUNT(*) AS c FROM booking
+    WHERE Student_ID = '$studentIdEsc' AND Dropoff_Status = 'Pending'
+");
+$dropoffPendingCount = $dropoffPendingRes ? (int)$dropoffPendingRes->fetch_assoc()['c'] : 0;
+
 // ── Fetch bookings where verification was sent or already confirmed ───────────
 $verifyQ = $conn->query("
     SELECT b.Booking_ID, b.Pickup_Date, b.DropOff_Date, b.Booking_Status,
            rc.Residential_Block,
-           COALESCE(SUM(i.Quantity), 0) AS TotalItem,
-           COALESCE(SUM(i.Quantity * i.Price), 0) AS TotalFee
+           (SELECT COALESCE(SUM(i.Quantity), 0) FROM item i WHERE i.Booking_ID = b.Booking_ID)           AS TotalItem,
+           (SELECT COALESCE(SUM(i.Quantity * i.Price), 0) FROM item i WHERE i.Booking_ID = b.Booking_ID) AS TotalFee,
+           (SELECT Amount FROM payment WHERE Booking_ID = b.Booking_ID LIMIT 1)                          AS PaymentAmount
     FROM booking b
     LEFT JOIN student s ON b.Student_ID = s.Student_ID
     LEFT JOIN residential_college rc ON s.Residential_ID = rc.Residential_ID
-    LEFT JOIN item i ON b.Booking_ID = i.Booking_ID
-    WHERE b.Student_ID = '$student_id'
+    WHERE b.Student_ID = '$studentIdEsc'
       AND b.Booking_Status IN ('Verification_Sent', 'Confirmed')
-    GROUP BY b.Booking_ID, b.Pickup_Date, b.DropOff_Date, b.Booking_Status, rc.Residential_Block
     ORDER BY b.Pickup_Date ASC
 ");
 
@@ -117,6 +124,13 @@ $conn->close();
         <div class="msg-banner msg-success"> Confirmed! Please proceed to collect your items from the storage room.</div>
         <?php endif; ?>
 
+        <?php if ($dropoffPendingCount > 0): ?>
+        <div class="msg-banner" style="background: rgba(245,158,11,0.12); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3);">
+             You also have <?php echo $dropoffPendingCount; ?> drop-off photo<?php echo $dropoffPendingCount !== 1 ? 's' : ''; ?> waiting for your confirmation —
+            <a href="mainStatus.php" style="color: #f59e0b; font-weight: 800; text-decoration: underline;">check your main dashboard</a>.
+        </div>
+        <?php endif; ?>
+
         <div class="step-guide">
             <h4> How to collect your items</h4>
             <ol>
@@ -130,6 +144,7 @@ $conn->close();
         <?php if ($verifyQ && $verifyQ->num_rows > 0):
             while ($row = $verifyQ->fetch_assoc()):
                 $bs = $row['Booking_Status'];
+                $feeToShow = $row['PaymentAmount'] ?? $row['TotalFee'];
         ?>
         <div class="verify-card">
             <div class="verify-header">
@@ -146,7 +161,7 @@ $conn->close();
                 <p>Drop-off  : <?php echo htmlspecialchars($row['DropOff_Date']); ?></p>
                 <p>Pick-up   : <?php echo htmlspecialchars($row['Pickup_Date']); ?></p>
                 <p>Items     : <?php echo $row['TotalItem']; ?></p>
-                <p>Total fee : RM <?php echo number_format((float)$row['TotalFee'], 2); ?></p>
+                <p>Total fee : RM <?php echo number_format((float)$feeToShow, 2); ?></p>
             </div>
 
             <?php if ($bs === 'Confirmed'): ?>

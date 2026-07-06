@@ -8,6 +8,7 @@ if (!isset($_SESSION['Staff_ID']) || $_SESSION['role'] !== 'staff') {
 
 $conn = new mysqli("localhost", "root", "", "utem_accommodation");
 if ($conn->connect_error) die("Connection Failed: " . $conn->connect_error);
+$conn->query("SET time_zone = '+08:00'"); // keep MySQL NOW()/CURDATE() aligned with Malaysia time
 
 $staff_name = $_SESSION['Staff_Name'] ?? 'Staff';
 
@@ -68,6 +69,43 @@ $approved        = $conn->query("SELECT COUNT(*) AS c FROM booking WHERE LOWER(B
 $total           = $conn->query("SELECT COUNT(*) AS c FROM booking")->fetch_assoc()['c'];
 $collected       = $conn->query("SELECT COUNT(*) AS c FROM booking WHERE LOWER(Booking_Status)='collected'")->fetch_assoc()['c'];
 $pendingStudents = $conn->query("SELECT COUNT(DISTINCT Student_ID) AS c FROM booking WHERE LOWER(Booking_Status)='pending'")->fetch_assoc()['c'];
+
+// ── Notification badge count: everything needing staff action today ──────────
+function safeCount(mysqli $conn, string $sql): int {
+    $res = $conn->query($sql);
+    if (!$res) return 0; // never let a failed query take down the whole dashboard
+    $row = $res->fetch_assoc();
+    return (int)($row['c'] ?? 0);
+}
+
+$needUploadCount = safeCount($conn, "
+    SELECT COUNT(*) AS c
+    FROM booking b
+    WHERE LOWER(b.Booking_Status) = 'approved'
+      AND b.DropOff_Date = CURDATE()
+      AND (b.Dropoff_Photo IS NULL OR b.Dropoff_Photo = '')
+      AND EXISTS (
+            SELECT 1 FROM payment p
+            WHERE p.Booking_ID = b.Booking_ID AND UPPER(p.Payment_Status) = 'Y'
+          )
+");
+
+$needSendCount = safeCount($conn, "SELECT COUNT(*) AS c FROM booking WHERE Dropoff_Status = 'Uploaded'");
+
+$needReuploadCount = safeCount($conn, "SELECT COUNT(*) AS c FROM booking WHERE Dropoff_Status = 'Rejected'");
+
+$needVerifyCount = safeCount($conn, "
+    SELECT COUNT(*) AS c FROM booking
+    WHERE LOWER(Booking_Status) = 'approved' AND Dropoff_Status = 'Confirmed' AND Pickup_Date = CURDATE()
+");
+
+$overdueCount = safeCount($conn, "
+    SELECT COUNT(*) AS c FROM booking
+    WHERE LOWER(Booking_Status) = 'approved' AND DATE_ADD(Pickup_Date, INTERVAL 11 HOUR) < NOW()
+");
+
+$notifTotal = $needUploadCount + $needSendCount + $needReuploadCount
+            + $needVerifyCount + $overdueCount + (int)$pending;
 
 // ── Tab queries ───────────────────────────────────────────────────────────────
 function bookingQuery(mysqli $conn, array $statuses, string $order = "b.Booking_ID DESC"): mysqli_result|false {
@@ -267,6 +305,45 @@ $activeTab = $_GET['tab'] ?? 'pending';
         #profileSelect button { background:none; border:none; color:#E8E9DE; padding:10px; text-align:left; width:100%; cursor:pointer; font-size:0.85rem; }
         #profileSelect button:hover { background-color:rgba(232,233,222,0.2); }
 
+        /* ── Notification badge (deliberately eye-catching — this is meant to be noticed) ── */
+        .notif-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            background: #ef4444;
+            color: #fff;
+            font-size: 0.65rem;
+            font-weight: 800;
+            min-width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 3px;
+            line-height: 1;
+            box-shadow: 0 0 0 2px #241253;
+            animation: notifPulse 2s ease-in-out infinite;
+        }
+        @keyframes notifPulse {
+            0%, 100% { box-shadow: 0 0 0 2px #241253, 0 0 0 0 rgba(239,68,68,0.6); }
+            50%      { box-shadow: 0 0 0 2px #241253, 0 0 0 4px rgba(239,68,68,0); }
+        }
+        .notif-badge-inline {
+            background: #ef4444;
+            color: #fff;
+            font-size: 0.68rem;
+            font-weight: 800;
+            border-radius: 10px;
+            padding: 2px 8px;
+            margin-left: 8px;
+        }
+        #profileSelect button {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
         @media (max-width: 768px) {
             .stats-row { flex-direction:column; }
             .quick-actions { flex-direction:column; }
@@ -292,9 +369,20 @@ $activeTab = $_GET['tab'] ?? 'pending';
             Welcome,
             <span id="currentName"><?php echo htmlspecialchars($staff_name); ?></span>
             <span id="profileContainer">
-                <img id="userImage" src="image/user.png" width="20px" height="20px" onclick="profileMenu()">
+                <span style="position:relative; display:inline-block;">
+                    <img id="userImage" src="image/user.png" width="20px" height="20px" onclick="profileMenu()">
+                    <?php if ($notifTotal > 0): ?>
+                        <span class="notif-badge"><?php echo $notifTotal; ?></span>
+                    <?php endif; ?>
+                </span>
                 <div id="profileSelect">
                     <button onclick="showProfile()">Profile</button>
+                    <button onclick="window.location.href='staffNotifications.php'">
+                        Notifications
+                        <?php if ($notifTotal > 0): ?>
+                            <span class="notif-badge-inline"><?php echo $notifTotal; ?></span>
+                        <?php endif; ?>
+                    </button>
                     <button onclick="showLog()">Logout</button>
                 </div>
             </span>

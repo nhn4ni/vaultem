@@ -1,6 +1,7 @@
 <?php
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
+date_default_timezone_set('Asia/Kuala_Lumpur');
 
 session_start();
 
@@ -21,8 +22,7 @@ $studentIdEsc = mysqli_real_escape_string($conn, $student_id);
 $activeChk = mysqli_query($conn, "
     SELECT COUNT(*) AS c FROM booking
     WHERE Student_ID = '$studentIdEsc'
-      AND LOWER(Booking_Status) NOT IN ('rejected', 'collected', 'cancelled_unpaid')
-      AND Pickup_Date >= CURDATE()
+      AND LOWER(Booking_Status) NOT IN ('rejected', 'collected', 'cancelled_unpaid', 'cancelled', 'waived', 'settled')
 ");
 $activeRow = mysqli_fetch_assoc($activeChk);
 if ($activeRow['c'] > 0) {
@@ -113,6 +113,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($totalItems > 3) {
         die("Booking limit exceeded. You may only book a maximum of 3 items.");
+    }
+
+    // ── Enforce working-hour rules server-side too (client JS can be bypassed) ──
+    if ($dropOffDate === date('Y-m-d') && date('H:i:s') > '11:00:00') {
+        die("Today's drop-off window (8:00 AM - 11:00 AM) has already closed. Please choose a later drop-off date.");
+    }
+    if ($pickupDate <= $dropOffDate) {
+        die("Invalid dates: pick-up date must be strictly after the drop-off date.");
     }
 
     $totalPrice =
@@ -987,6 +995,9 @@ mysqli_close($conn);
             const todayDay   = today.getDate();
             const bounds     = getWindowBounds();
 
+            // Working hours cutoff: once past 11:00 AM, "today" is no longer a valid drop-off day.
+            const pastElevenAM = today.getHours() > 11 || (today.getHours() === 11 && (today.getMinutes() > 0 || today.getSeconds() > 0));
+
             const allMonths = ['January','February','March','April','May','June',
                                'July','August','September','October','November','December'];
 
@@ -1015,15 +1026,48 @@ mysqli_close($conn);
                 selectEl.selectedIndex = 0;
             }
 
+            // Returns the currently selected drop-off date as 'YYYY-MM-DD', or null if not yet chosen
+            function getSelectedDropOffDateStr() {
+                if (!dropOffMonth.value || !dropOffDay.value) return null;
+                const m = parseInt(dropOffMonth.value) + 1;
+                return `${currentYear}-${padTwo(m)}-${dropOffDay.value}`;
+            }
+
+            function addDaysToDateStr(dateStr, days) {
+                const d = new Date(dateStr + 'T00:00:00');
+                d.setDate(d.getDate() + days);
+                return `${d.getFullYear()}-${padTwo(d.getMonth()+1)}-${padTwo(d.getDate())}`;
+            }
+
             function fillDaysFiltered(selectElement, monthIndex, isPickup) {
                 selectElement.innerHTML = '';
                 const totalDays = getDaysInMonth(monthIndex);
 
-                // Start day: today or tomorrow (for pickup), but not before window start
+                // Start day: today (or tomorrow if past working hours) for drop-off;
+                // for pickup, start from the day after the currently selected drop-off date.
                 let startDay = 1;
-                if (monthIndex === todayMonth) {
-                    startDay = isPickup ? todayDay + 1 : todayDay;
+                if (isPickup) {
+                    const dropOffStr = getSelectedDropOffDateStr();
+                    const minPickupStr = dropOffStr ? addDaysToDateStr(dropOffStr, 1) : null;
+                    if (monthIndex === todayMonth) {
+                        startDay = todayDay + 1;
+                    }
+                    if (minPickupStr) {
+                        const minParts2 = minPickupStr.split('-');
+                        const minMonth2 = parseInt(minParts2[1]) - 1;
+                        const minDay2   = parseInt(minParts2[2]);
+                        if (monthIndex < minMonth2) {
+                            startDay = totalDays + 1; // whole month is before the allowed pickup start — nothing selectable
+                        } else if (monthIndex === minMonth2 && minDay2 > startDay) {
+                            startDay = minDay2;
+                        }
+                    }
+                } else {
+                    if (monthIndex === todayMonth) {
+                        startDay = pastElevenAM ? todayDay + 1 : todayDay;
+                    }
                 }
+
                 // Don't go before window start day if in window's first month
                 if (monthIndex === winMinMonth && winMinDay > startDay) {
                     startDay = winMinDay;
@@ -1053,6 +1097,12 @@ mysqli_close($conn);
 
             dropOffMonth.addEventListener('change', function () {
                 fillDaysFiltered(dropOffDay, parseInt(this.value), false);
+                // Drop-off changed, so pickup's minimum allowed date shifts too
+                fillDaysFiltered(pickupDay, parseInt(pickupMonth.value), true);
+            });
+
+            dropOffDay.addEventListener('change', function () {
+                fillDaysFiltered(pickupDay, parseInt(pickupMonth.value), true);
             });
 
             pickupMonth.addEventListener('change', function () {

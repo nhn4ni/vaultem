@@ -1,6 +1,8 @@
 <?php
 
 function autoCancelExpiredBookings(mysqli $conn) {
+    $conn->query("SET time_zone = '+08:00'"); // keep MySQL NOW()/CURDATE()/CURTIME() aligned with Malaysia time
+
     $expiredQuery = $conn->query("
         SELECT b.Booking_ID
         FROM booking b

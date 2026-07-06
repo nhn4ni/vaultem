@@ -111,13 +111,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dropoff_confirm_id'])
 $student_id   = $_SESSION['Student_ID'];
 $studentIdEsc = $conn->real_escape_string($student_id);
 
+// ── Notification count: things needing the student's attention ───────────────
+$notifCountRes = $conn->query("
+    SELECT COUNT(*) AS c FROM booking
+    WHERE Student_ID = '$studentIdEsc'
+      AND (
+            LOWER(Booking_Status) = 'verification_sent'
+            OR Dropoff_Status = 'Pending'
+          )
+");
+$notifCount = $notifCountRes ? (int)$notifCountRes->fetch_assoc()['c'] : 0;
+
 // ── Check if student has an active booking ────────────────────────────────────
-// Active = any booking that is NOT rejected, NOT collected, AND pickup date not yet passed
+// Active = any booking not yet fully closed out (not rejected, collected, cancelled, waived, or settled)
+// A booking stays "active" even after its pickup date passes, until the student actually collects their items.
 $activeCheck = $conn->query("
     SELECT COUNT(*) AS c FROM booking
     WHERE Student_ID = '$studentIdEsc'
-      AND LOWER(Booking_Status) NOT IN ('rejected', 'collected', 'cancelled_unpaid')
-      AND Pickup_Date >= CURDATE()
+      AND LOWER(Booking_Status) NOT IN ('rejected', 'collected', 'cancelled_unpaid', 'cancelled', 'waived', 'settled')
 ");
 $hasActiveBooking = ($activeCheck && $activeCheck->fetch_assoc()['c'] > 0);
 
@@ -329,6 +340,51 @@ $result = $conn->query($sql);
             margin-left: 8px;
         }
         .confirm-no-btn:hover { background-color: #bd2130; }
+
+        /* ── Notification badge (WhatsApp-style unread indicator) ── */
+        .notif-badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            background: #dc3545;
+            color: #fff;
+            font-size: 0.62rem;
+            font-weight: 800;
+            min-width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 3px;
+            line-height: 1;
+            box-shadow: 0 0 0 2px #241253;
+        }
+        .notif-badge-inline {
+            background: #dc3545;
+            color: #fff;
+            font-size: 0.65rem;
+            font-weight: 800;
+            border-radius: 10px;
+            padding: 1px 7px;
+            margin-left: 8px;
+        }
+        #profileSelect button {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .verif-action-note {
+            margin-top: 10px;
+            background: #cfe2ff;
+            color: #084298;
+            border: 1px solid rgba(8,66,152,0.3);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .status-verification_sent { background-color: #cfe2ff; color: #084298; }
         
     </style>
 </head>
@@ -342,7 +398,7 @@ $result = $conn->query($sql);
         <button type="button" id="booking"
             <?php if ($hasActiveBooking): ?>
                 disabled
-                title="You already have an active booking. You can book again after your pick-up date."
+                title="You already have a booking in progress. You can book again once your items are collected."
                 style="opacity:0.45; cursor:not-allowed; transform:none;"
             <?php else: ?>
                 onclick="window.location.href='form.php'"
@@ -351,7 +407,7 @@ $result = $conn->query($sql);
         </button>
         <?php if ($hasActiveBooking): ?>
             <p style="font-size:0.72rem; color:rgba(36,18,83,0.6); text-align:center; margin-top:6px; padding: 0 8px;">
-                Available after pick-up date
+                Available after your items are collected
             </p>
         <?php endif; ?>
     </div>
@@ -362,11 +418,21 @@ $result = $conn->query($sql);
             <span id="currentName"><?php echo isset($_SESSION['Student_Name']) ? htmlspecialchars($_SESSION['Student_Name']) : 'Guest'; ?></span>
 
             <span id="profileContainer">
-                <img id="userImage" src="image/user.png" width="20px" height="20px" onclick="profileMenu()">
+                <span style="position:relative; display:inline-block;">
+                    <img id="userImage" src="image/user.png" width="20px" height="20px" onclick="profileMenu()">
+                    <?php if ($notifCount > 0): ?>
+                        <span class="notif-badge"><?php echo $notifCount; ?></span>
+                    <?php endif; ?>
+                </span>
                 <div id="profileSelect">
                     <button onclick="showProfile();">Profile</button>
                     <button onclick="window.location.href='settings.php'">Settings</button>
-                    <button onclick="window.location.href='studentverify.php'">Notification</button>
+                    <button onclick="window.location.href='studentverify.php'">
+                        Notification
+                        <?php if ($notifCount > 0): ?>
+                            <span class="notif-badge-inline"><?php echo $notifCount; ?></span>
+                        <?php endif; ?>
+                    </button>
                     <button onclick="showLog();">Logout</button>
                 </div>
             </span>
@@ -376,7 +442,7 @@ $result = $conn->query($sql);
 
         <?php if (isset($_GET['msg']) && $_GET['msg'] === 'already_booked'): ?>
         <div style="background:#fff3cd; color:#856404; border:1px solid rgba(245,158,11,0.4); border-radius:12px; padding:10px 16px; font-size:0.85rem; font-weight:600; margin-bottom:14px;">
-            You already have an active booking. You can make a new booking after your current pick-up date has passed.
+            You already have a booking in progress. You can make a new booking once your items have been collected.
         </div>
         <?php endif; ?>
 
@@ -431,6 +497,10 @@ $result = $conn->query($sql);
                 } elseif ($currentStatusLower === 'pending') {
                     $statusBadgeClass = 'status-pending';
                 } elseif ($currentStatusLower === 'approved') {
+                    $statusBadgeClass = 'status-approved';
+                } elseif ($currentStatusLower === 'verification_sent') {
+                    $statusBadgeClass = 'status-verification_sent';
+                } elseif ($currentStatusLower === 'confirmed') {
                     $statusBadgeClass = 'status-approved';
                 } else {
                     $statusBadgeClass = 'status-rejected';
@@ -496,6 +566,10 @@ $result = $conn->query($sql);
                 <?php elseif ($currentStatusLower === 'cancelled_unpaid'): ?>
                     <div class="cancelled-note">
                         <strong>Automatically Cancelled</strong> — payment wasn't completed before your chosen drop-off date, so this booking and its reserved slot were released.
+                    </div>
+                <?php elseif ($currentStatusLower === 'verification_sent'): ?>
+                    <div class="verif-action-note">
+                         Staff has sent a pickup verification request. Please check your Notification page to confirm.
                     </div>
                 <?php endif; ?>
 

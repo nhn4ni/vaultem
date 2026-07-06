@@ -11,6 +11,7 @@ if (!isset($_SESSION['Staff_ID']) || $_SESSION['role'] !== 'staff') {
 
 $conn = new mysqli("localhost", "root", "", "utem_accommodation");
 if ($conn->connect_error) die("Connection Failed: " . $conn->connect_error);
+$conn->query("SET time_zone = '+08:00'"); // keep MySQL NOW()/CURDATE() aligned with Malaysia time
 
 $staff_name   = $_SESSION['Staff_Name'] ?? 'Staff';
 $PENALTY_RATE = 2.00;
