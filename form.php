@@ -202,7 +202,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     mysqli_close($conn);
 
     echo "<h2>Booking Successful!</h2>";
-    echo "<p>Your booking has been confirmed. Redirecting to payment...</p>";
     echo "<meta http-equiv='refresh' content='3;URL=payment.php?booking_id=" . $booking_id . "&amount=" . $totalPrice . "'>";
     exit();
 }
