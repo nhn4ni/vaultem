@@ -13,6 +13,7 @@ $staff_name = $_SESSION['Staff_Name'] ?? 'Staff';
 $bid = intval($_GET['id'] ?? 0);
 
 // ── Staff working hours: drop-off photo upload & pickup verify only allowed 8AM-11AM ──
+date_default_timezone_set('Asia/Kuala_Lumpur');
 $currentTime         = date('H:i:s');
 $withinWorkingHours  = ($currentTime >= '08:00:00' && $currentTime <= '11:00:00');
 
