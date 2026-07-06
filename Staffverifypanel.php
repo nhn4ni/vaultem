@@ -11,6 +11,11 @@ if ($conn->connect_error) die("Connection Failed: " . $conn->connect_error);
 
 $staff_name = $_SESSION['Staff_Name'] ?? 'Staff';
 
+// ── Staff working hours: verification only allowed 8AM-11AM, same rule as staffBookingDetail.php ──
+date_default_timezone_set('Asia/Kuala_Lumpur');
+$currentTime        = date('H:i:s');
+$withinWorkingHours = ($currentTime >= '08:00:00' && $currentTime <= '11:00:00');
+
 // ── Status values used (no new columns — all stored in Booking_Status) ─────────
 // Approved           → approved, not yet sent
 // Verification_Sent  → staff sent request to student
@@ -20,6 +25,19 @@ $staff_name = $_SESSION['Staff_Name'] ?? 'Staff';
 // ── Handle send verification ──────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_verify_id'])) {
     $bid = intval($_POST['send_verify_id']);
+
+    if (!$withinWorkingHours) {
+        header("Location: staffVerifyPanel.php?msg=outside_hours");
+        exit();
+    }
+
+    $confirmCheck = $conn->query("SELECT Dropoff_Status FROM booking WHERE Booking_ID = $bid LIMIT 1");
+    $confirmed    = $confirmCheck && $confirmCheck->num_rows > 0 && $confirmCheck->fetch_assoc()['Dropoff_Status'] === 'Confirmed';
+    if (!$confirmed) {
+        header("Location: staffVerifyPanel.php?msg=no_photo");
+        exit();
+    }
+
     $stmt = $conn->prepare("UPDATE booking SET Booking_Status = 'Verification_Sent' WHERE Booking_ID = ? AND LOWER(Booking_Status) = 'approved'");
     $stmt->bind_param("i", $bid);
     $stmt->execute();
@@ -31,6 +49,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_verify_id'])) {
 // ── Handle resend ─────────────────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resend_verify_id'])) {
     $bid = intval($_POST['resend_verify_id']);
+
+    if (!$withinWorkingHours) {
+        header("Location: staffVerifyPanel.php?msg=outside_hours");
+        exit();
+    }
+
     $stmt = $conn->prepare("UPDATE booking SET Booking_Status = 'Verification_Sent' WHERE Booking_ID = ? AND Booking_Status = 'Verification_Sent'");
     $stmt->bind_param("i", $bid);
     $stmt->execute();
@@ -60,7 +84,7 @@ if ($filter === 'confirmed') $filterWhere = "AND b.Booking_Status = 'Confirmed'"
 
 // ── Fetch bookings ────────────────────────────────────────────────────────────
 $bookings = $conn->query("
-    SELECT b.Booking_ID, b.Pickup_Date, b.DropOff_Date, b.Booking_Status,
+    SELECT b.Booking_ID, b.Pickup_Date, b.DropOff_Date, b.Booking_Status, b.Dropoff_Status,
            s.Student_Name, s.Student_ID, s.Student_PhoneNo,
            rc.Residential_Block,
            COALESCE(SUM(i.Quantity), 0) AS TotalItem
@@ -69,7 +93,7 @@ $bookings = $conn->query("
     LEFT JOIN residential_college rc ON s.Residential_ID = rc.Residential_ID
     LEFT JOIN item i ON b.Booking_ID = i.Booking_ID
     WHERE 1=1 $filterWhere
-    GROUP BY b.Booking_ID, b.Pickup_Date, b.DropOff_Date, b.Booking_Status,
+    GROUP BY b.Booking_ID, b.Pickup_Date, b.DropOff_Date, b.Booking_Status, b.Dropoff_Status,
              s.Student_Name, s.Student_ID, s.Student_PhoneNo, rc.Residential_Block
     ORDER BY b.Pickup_Date ASC
 ");
@@ -124,6 +148,7 @@ $conn->close();
 
         .btn-send    { background: #6f42c1; color: #fff; border: none; padding: 8px 20px; border-radius: 16px; font-weight: bold; font-size: 0.82rem; cursor: pointer; }
         .btn-send:hover    { background: #59359a; transform: translateY(-1px); }
+        .btn-send:disabled { background: #999; cursor: not-allowed; opacity: 0.6; }
         .btn-release { background: #198754; color: #fff; border: none; padding: 8px 20px; border-radius: 16px; font-weight: bold; font-size: 0.82rem; cursor: pointer; }
         .btn-release:hover { background: #157347; transform: translateY(-1px); }
         .btn-view    { background: #241253; color: #E8E9DE; border: none; padding: 8px 18px; border-radius: 16px; font-size: 0.8rem; font-weight: bold; text-decoration: none; display: inline-block; }
@@ -131,10 +156,12 @@ $conn->close();
 
         .action-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
         .overdue-flag { font-size: 0.75rem; color: #dc3545; font-weight: bold; }
+        .verify-blocked-note { font-size: 0.75rem; color: #856404; font-weight: 600; }
 
         .msg-banner { padding: 10px 16px; border-radius: 12px; font-size: 0.88rem; font-weight: 600; margin-bottom: 18px; }
         .msg-success { background: rgba(25,135,84,0.12); color: #198754; border: 1px solid rgba(25,135,84,0.3); }
         .msg-info    { background: rgba(124,92,252,0.10); color: #b084ff; border: 1px solid rgba(124,92,252,0.25); }
+        .msg-error   { background: rgba(239,68,68,0.1); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
 
         .section-label { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: #8b82b5; margin-bottom: 12px; }
         .empty-box { background: #f1f0ea; color: #8b82b5; border-radius: 20px; padding: 40px; text-align: center; }
@@ -176,12 +203,18 @@ $conn->close();
 
         <h1>Verification Panel</h1>
 
-        <?php if (isset($_GET['msg'])): ?>
-        <div class="msg-banner <?php echo $_GET['msg'] === 'released' ? 'msg-success' : 'msg-info'; ?>">
+        <?php if (isset($_GET['msg'])):
+            $msgClass = 'msg-info';
+            if ($_GET['msg'] === 'released') $msgClass = 'msg-success';
+            if (in_array($_GET['msg'], ['outside_hours', 'no_photo'])) $msgClass = 'msg-error';
+        ?>
+        <div class="msg-banner <?php echo $msgClass; ?>">
             <?php
                 $msgs = [
                     'sent'     => ' Verification request sent to student.',
                     'released' => ' Items marked as collected successfully.',
+                    'outside_hours' => 'This action is only available during working hours (8:00 AM - 11:00 AM).',
+                    'no_photo' => 'The drop-off photo must be uploaded and confirmed by the student before sending verification. Go to "View Booking" to upload it first.',
                 ];
                 echo $msgs[$_GET['msg']] ?? '';
             ?>
@@ -260,11 +293,25 @@ $conn->close();
                         <input type="hidden" name="resend_verify_id" value="<?php echo $row['Booking_ID']; ?>">
                         <button type="submit" class="btn-send">↺ Resend Request</button>
                     </form>
-                <?php else: ?>
+                <?php elseif ($row['Dropoff_Status'] === 'Confirmed' && $withinWorkingHours): ?>
                     <form method="POST" style="display:inline">
                         <input type="hidden" name="send_verify_id" value="<?php echo $row['Booking_ID']; ?>">
                         <button type="submit" class="btn-send">Send Verification →</button>
                     </form>
+                <?php else: ?>
+                    <button class="btn-send" disabled
+                        title="<?php echo $row['Dropoff_Status'] !== 'Confirmed' ? 'Drop-off photo must be uploaded and confirmed by the student first' : 'Only available 8:00 AM - 11:00 AM'; ?>">
+                        Send Verification →
+                    </button>
+                    <span class="verify-blocked-note">
+                        <?php
+                            if ($row['Dropoff_Status'] !== 'Confirmed') {
+                                echo 'Upload & confirm drop-off photo first';
+                            } else {
+                                echo 'Only available 8:00 AM - 11:00 AM';
+                            }
+                        ?>
+                    </span>
                 <?php endif; ?>
                 <a href="staffBookingDetail.php?id=<?php echo $row['Booking_ID']; ?>" class="btn-view">View Booking</a>
             </div>
