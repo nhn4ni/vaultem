@@ -129,7 +129,7 @@ function bookingQuery(mysqli $conn, array $statuses, string $order = "b.Booking_
 // Pending — oldest first so longest waiting gets reviewed first
 $pendingQ   = bookingQuery($conn, ['pending'], 'b.Booking_ID ASC');
 // Approved — newest first
-$approvedQ  = bookingQuery($conn, ['approved','verification_sent','confirmed'], 'b.Booking_ID DESC');
+$approvedQ  = bookingQuery($conn, ['approved','verification_sent','confirmed','released'], 'b.Booking_ID DESC');
 // Cancelled/rejected — oldest first (first out, stack at bottom)
 $cancelledQ = bookingQuery($conn, ['rejected','cancelled','cancelled_unpaid','waived','settled'], 'b.Booking_ID ASC');
 // Collected — newest first
@@ -487,6 +487,7 @@ $activeTab = $_GET['tab'] ?? 'pending';
             elseif ($bsl === 'rejected')          $sc = 'status-rejected';
             elseif ($bsl === 'verification_sent') $sc = 'status-verification_sent';
             elseif ($bsl === 'confirmed')         $sc = 'status-confirmed';
+            elseif ($bsl === 'released')          $sc = 'status-verification_sent';
             elseif ($bsl === 'collected')         $sc = 'status-collected';
             else                                  $sc = 'status-other';
             ?>
@@ -671,6 +672,13 @@ $activeTab = $_GET['tab'] ?? 'pending';
     function profileMenu() { document.getElementById('profileSelect').classList.toggle('show'); }
     function showProfile() { document.getElementById('profilePopup').classList.toggle('hidden'); }
     function showLog()     { document.getElementById('logoutPopup').classList.toggle('hidden'); }
+
+    // ── Intercept browser back button: show logout confirmation instead of leaving ──
+    history.pushState(null, '', location.href);
+    window.addEventListener('popstate', function () {
+        history.pushState(null, '', location.href);
+        document.getElementById('logoutPopup').classList.remove('hidden');
+    });
     document.addEventListener('click', function(e) {
         const c = document.getElementById('profileContainer');
         if (!c.contains(e.target)) document.getElementById('profileSelect').classList.remove('show');
