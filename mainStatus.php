@@ -136,6 +136,14 @@ $notifCountRes = $conn->query("
 ");
 $notifCount = $notifCountRes ? (int)$notifCountRes->fetch_assoc()['c'] : 0;
 
+// ── Count specifically for pickup verification requests (drives the login popup) ──
+$verifyNoticeRes = $conn->query("
+    SELECT COUNT(*) AS c FROM booking
+    WHERE Student_ID = '$studentIdEsc'
+      AND LOWER(Booking_Status) = 'verification_sent'
+");
+$verifyNoticeCount = $verifyNoticeRes ? (int)$verifyNoticeRes->fetch_assoc()['c'] : 0;
+
 // ── Check if student has an active booking ────────────────────────────────────
 // Active = any booking not yet fully closed out (not rejected, collected, cancelled, waived, or settled)
 // A booking stays "active" even after its pickup date passes, until the student actually collects their items.
@@ -399,6 +407,43 @@ $result = $conn->query($sql);
             font-weight: 600;
         }
         .status-verification_sent { background-color: #cfe2ff; color: #084298; }
+
+        /* ── Verification notice popup (shown automatically on login) ── */
+        #verifyNotifyPopup {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 300;
+        }
+        #verifyNotifyText {
+            background-color: #f1f0ea;
+            color: #1e1b4b;
+            padding: 30px;
+            border-radius: 20px;
+            width: 320px;
+            text-align: center;
+        }
+        #verifyNotifyButtons {
+            margin-top: 18px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+        #verifyNotifyButtons button {
+            padding: 10px 22px;
+            border: none;
+            border-radius: 20px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        #verifyGoBTN { background: #084298; color: #fff; }
+        #verifyGoBTN:hover { background: #063170; }
+        #verifyLaterBTN { background: #e2e3e5; color: #495057; }
+        #verifyLaterBTN:hover { background: #d3d4d6; }
         
     </style>
 </head>
@@ -692,6 +737,18 @@ $result = $conn->query($sql);
     </div>
 </div>
 
+<!-- Verification notice popup: shown automatically when a pickup verification is pending -->
+<div id="verifyNotifyPopup" class="hidden">
+    <div id="verifyNotifyText">
+        <p> Staff has sent a pickup verification request.</p>
+        <p style="font-size:0.82rem; color:#555; margin-top:6px;">Please confirm so staff can release your items.</p>
+        <div id="verifyNotifyButtons">
+            <button id="verifyGoBTN" onclick="window.location.href='studentverify.php'">Go</button>
+            <button id="verifyLaterBTN" onclick="closeVerifyNotify()">Later</button>
+        </div>
+    </div>
+</div>
+
 <script>
     function confirmCancellation(bookingId) {
         if (confirm("Are you sure you want to permanently cancel and remove booking ID #" + bookingId + "? This cannot be undone.")) {
@@ -711,6 +768,15 @@ $result = $conn->query($sql);
     function showLog() { 
         document.getElementById('logoutPopup').classList.toggle('hidden'); 
     }
+
+    function closeVerifyNotify() {
+        document.getElementById('verifyNotifyPopup').classList.add('hidden');
+    }
+
+    // ── Show verification notice popup automatically on login if staff sent a request ──
+    <?php if ($verifyNoticeCount > 0): ?>
+    document.getElementById('verifyNotifyPopup').classList.remove('hidden');
+    <?php endif; ?>
 
     // ── Intercept browser back button: show logout confirmation instead of leaving ──
     history.pushState(null, '', location.href);
