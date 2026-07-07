@@ -121,6 +121,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['collected_confirm_id'
     exit();
 }
 
+// ── Handle Penalty Payment (student pays an overdue-pickup fine directly) ────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['pay_penalty_id'])) {
+    $payID      = intval($_POST['pay_penalty_id']);
+    $student_id = $_SESSION['Student_ID'];
+    $studentEsc = $conn->real_escape_string($student_id);
+
+    // Re-verify server-side that this booking truly belongs to the student and is genuinely overdue
+    $checkRes = $conn->query("
+        SELECT GREATEST(0, CEIL(TIMESTAMPDIFF(SECOND, DATE_ADD(Pickup_Date, INTERVAL 11 HOUR), NOW()) / 86400)) AS DaysOverdue
+        FROM booking
+        WHERE Booking_ID = $payID AND Student_ID = '$studentEsc' AND LOWER(Booking_Status) = 'approved'
+    ");
+    $overdueRow = $checkRes ? $checkRes->fetch_assoc() : null;
+
+    if ($overdueRow && (int)$overdueRow['DaysOverdue'] > 0) {
+        $stmt = $conn->prepare("UPDATE booking SET Booking_Status = 'Settled' WHERE Booking_ID = ? AND Student_ID = ? AND LOWER(Booking_Status) = 'approved'");
+        $stmt->bind_param("is", $payID, $student_id);
+        $stmt->execute();
+        $stmt->close();
+    }
+
+    header("Location: mainStatus.php" . (isset($_GET['sort']) ? "?sort=" . $_GET['sort'] : ""));
+    exit();
+}
+
 // ── Student ID (needed for all queries below) ─────────────────────────────────
 $student_id   = $_SESSION['Student_ID'];
 $studentIdEsc = $conn->real_escape_string($student_id);
@@ -157,6 +182,9 @@ $hasActiveBooking = ($activeCheck && $activeCheck->fetch_assoc()['c'] > 0);
 // ── Sort order ───────────────────────────────────────────────────────────────
 $order = (isset($_GET['sort']) && $_GET['sort'] === 'old') ? 'ASC' : 'DESC';
 
+// ── Penalty rate (must match staffpenalty.php) ────────────────────────────────
+$PENALTY_RATE = 2.00;
+
 // ── Fetch bookings for the logged-in student only ────────────────────────────
 
 $sql = "
@@ -173,7 +201,8 @@ $sql = "
         s.Student_Name,
         rc.Residential_Block,
         IFNULL((SELECT SUM(Quantity) FROM item WHERE Booking_ID = b.Booking_ID), 0) AS TotalItem,
-        IFNULL((SELECT SUM(Quantity * Price) FROM item WHERE Booking_ID = b.Booking_ID), 0) AS TotalFee
+        IFNULL((SELECT SUM(Quantity * Price) FROM item WHERE Booking_ID = b.Booking_ID), 0) AS TotalFee,
+        GREATEST(0, CEIL(TIMESTAMPDIFF(SECOND, DATE_ADD(b.Pickup_Date, INTERVAL 11 HOUR), NOW()) / 86400)) AS DaysOverdue
     FROM booking b
     LEFT JOIN student s              ON b.Student_ID     = s.Student_ID
     LEFT JOIN item i                 ON b.Booking_ID     = i.Booking_ID
@@ -408,6 +437,24 @@ $result = $conn->query($sql);
         }
         .status-verification_sent { background-color: #cfe2ff; color: #084298; }
 
+        /* ── Overdue penalty note ── */
+        .overdue-penalty-note {
+            margin-top: 10px;
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid rgba(114,28,36,0.25);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 0.85rem;
+        }
+        .overdue-penalty-note strong { display: block; margin-bottom: 4px; }
+        .pay-penalty-btn {
+            background-color: #dc3545; color: white; border: none; border-radius: 15px;
+            padding: 8px 20px; font-weight: bold; cursor: pointer; font-size: 0.85rem;
+            margin-top: 8px;
+        }
+        .pay-penalty-btn:hover { background-color: #bd2130; }
+
         /* ── Verification notice popup (shown automatically on login) ── */
         #verifyNotifyPopup {
             position: fixed;
@@ -548,6 +595,11 @@ $result = $conn->query($sql);
                 // Helper variable to handle case-insensitive checks for button rendering
                 $currentStatusLower = strtolower($bookingStatus);
 
+                // Overdue pickup penalty (only relevant while still Approved and past the 11AM pickup deadline)
+                $daysOverdue    = (int)($row['DaysOverdue'] ?? 0);
+                $isOverduePenalty = ($currentStatusLower === 'approved' && $daysOverdue > 0);
+                $penaltyFine    = round($daysOverdue * $PENALTY_RATE, 2);
+
                 // Friendly label + badge class (handles the auto-cancelled state separately from staff rejection)
                 $displayStatus = $bookingStatus;
                 if ($currentStatusLower === 'cancelled_unpaid') {
@@ -643,6 +695,22 @@ $result = $conn->query($sql);
                             I've Collected My Items
                         </button>
                     </form>
+                <?php endif; ?>
+
+                <!-- Overdue pickup penalty -->
+                <?php if ($isOverduePenalty): ?>
+                <div class="overdue-penalty-note">
+                    <strong> Pickup Overdue</strong>
+                    Your pick-up deadline has passed by <?php echo $daysOverdue; ?> day<?php echo $daysOverdue !== 1 ? 's' : ''; ?>.
+                    A penalty of <strong>RM <?php echo number_format($penaltyFine, 2); ?></strong> has accrued.
+                    <form method="POST" style="margin-top:4px;">
+                        <input type="hidden" name="pay_penalty_id" value="<?php echo $bookingID; ?>">
+                        <button type="submit" class="pay-penalty-btn"
+                            onclick="return confirm('Pay overdue penalty of RM <?php echo number_format($penaltyFine, 2); ?> for Booking #<?php echo $bookingID; ?>?')">
+                            Pay Now (RM <?php echo number_format($penaltyFine, 2); ?>)
+                        </button>
+                    </form>
+                </div>
                 <?php endif; ?>
 
                 <!-- Drop-off photo verification / proof -->
