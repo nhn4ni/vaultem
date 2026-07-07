@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jul 05, 2026 at 05:32 PM
+-- Generation Time: Jul 05, 2026 at 10:15 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.0.30
 
@@ -37,27 +37,34 @@ CREATE TABLE `booking` (
   `Rejection_Photo` varchar(255) DEFAULT NULL,
   `Booking_Priority` char(1) NOT NULL,
   `Staff_ID` int(100) NOT NULL,
-  `Student_ID` varchar(10) NOT NULL
+  `Student_ID` varchar(10) NOT NULL,
+  `Dropoff_Photo` varchar(255) DEFAULT NULL,
+  `Dropoff_Status` varchar(20) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `booking`
 --
 
-INSERT INTO `booking` (`Booking_ID`, `Booking_Date`, `DropOff_Date`, `Pickup_Date`, `Booking_Status`, `Rejection_Reason`, `Rejection_Photo`, `Booking_Priority`, `Staff_ID`, `Student_ID`) VALUES
-(156, '2026-05-10', '2026-05-16', '2026-06-16', 'To be dropped off', NULL, NULL, '1', 1, 'S001'),
-(157, '2026-06-01', '2026-06-05', '2026-07-05', 'Stored', NULL, NULL, '2', 2, 'S002'),
-(158, '2026-06-25', '2026-05-01', '2026-08-01', 'Confirmed', NULL, NULL, 'N', 1, 'S001'),
-(159, '2026-06-25', '2026-01-25', '2026-01-26', 'Cancelled_Unpaid', NULL, NULL, 'N', 1, 'S001'),
-(160, '2026-06-25', '2026-01-25', '2026-01-26', 'Pending', NULL, NULL, 'N', 1, 'S001'),
-(161, '2026-06-26', '2026-06-26', '2026-06-27', 'Cancelled_Unpaid', NULL, NULL, 'Y', 1, 'S001'),
-(162, '2026-06-26', '2026-06-26', '2026-06-27', 'Cancelled_Unpaid', NULL, NULL, 'Y', 1, 'S001'),
-(163, '2026-07-01', '2026-07-01', '2026-07-02', 'Cancelled_Unpaid', NULL, NULL, 'N', 1, 'd032410358'),
-(164, '2026-07-02', '2026-07-02', '2026-07-03', 'Approved', NULL, NULL, 'Y', 1, 'd032410024'),
-(165, '2026-07-02', '2026-07-02', '2026-07-03', 'Rejected', 'saje je', 'uploads/rejections/reject_165_1782961339.jpeg', 'N', 1, 'd112410057'),
-(166, '2026-07-02', '2026-07-02', '2026-07-03', 'Cancelled_Unpaid', NULL, NULL, 'N', 1, 'd112410057'),
-(167, '2026-07-02', '2026-07-02', '2026-07-03', 'Approved', NULL, NULL, 'N', 1, 'd032410359'),
-(168, '2026-07-02', '2026-07-02', '2026-07-03', 'Pending', NULL, NULL, 'N', 1, 'd032410360');
+INSERT INTO `booking` (`Booking_ID`, `Booking_Date`, `DropOff_Date`, `Pickup_Date`, `Booking_Status`, `Rejection_Reason`, `Rejection_Photo`, `Booking_Priority`, `Staff_ID`, `Student_ID`, `Dropoff_Photo`, `Dropoff_Status`) VALUES
+(156, '2026-05-10', '2026-05-16', '2026-06-16', 'To be dropped off', NULL, NULL, '1', 1, 'S001', NULL, NULL),
+(157, '2026-06-01', '2026-06-05', '2026-07-05', 'Stored', NULL, NULL, '2', 2, 'S002', NULL, NULL),
+(158, '2026-06-25', '2026-05-01', '2026-08-01', 'Confirmed', NULL, NULL, 'N', 1, 'S001', NULL, NULL),
+(159, '2026-06-25', '2026-01-25', '2026-01-26', 'Cancelled_Unpaid', NULL, NULL, 'N', 1, 'S001', NULL, NULL),
+(160, '2026-06-25', '2026-01-25', '2026-01-26', 'Cancelled_Unpaid', NULL, NULL, 'N', 1, 'S001', NULL, NULL),
+(161, '2026-06-26', '2026-06-26', '2026-06-27', 'Cancelled_Unpaid', NULL, NULL, 'Y', 1, 'S001', NULL, NULL),
+(162, '2026-06-26', '2026-06-26', '2026-06-27', 'Cancelled_Unpaid', NULL, NULL, 'Y', 1, 'S001', NULL, NULL),
+(163, '2026-07-01', '2026-07-01', '2026-07-02', 'Cancelled_Unpaid', NULL, NULL, 'N', 1, 'd032410358', NULL, NULL),
+(164, '2026-07-02', '2026-07-02', '2026-07-03', 'Approved', NULL, NULL, 'Y', 1, 'd032410024', NULL, NULL),
+(165, '2026-07-02', '2026-07-02', '2026-07-03', 'Rejected', 'saje je', 'uploads/rejections/reject_165_1782961339.jpeg', 'N', 1, 'd112410057', NULL, NULL),
+(166, '2026-07-02', '2026-07-02', '2026-07-03', 'Cancelled_Unpaid', NULL, NULL, 'N', 1, 'd112410057', NULL, NULL),
+(167, '2026-07-02', '2026-07-02', '2026-07-03', 'Approved', NULL, NULL, 'N', 1, 'd032410359', NULL, NULL),
+(168, '2026-07-02', '2026-07-02', '2026-07-03', 'Cancelled_Unpaid', NULL, NULL, 'N', 1, 'd032410360', NULL, NULL),
+(172, '2026-07-05', '2026-07-05', '2026-07-16', 'Cancelled_Unpaid', NULL, NULL, 'N', 1, 'd032410024', NULL, NULL),
+(174, '2026-07-05', '2026-07-05', '2026-07-06', 'Rejected', 'tabole', 'uploads/rejection/reject_174_1783272194.jpeg', 'N', 1, 'd112410058', NULL, NULL),
+(175, '2026-07-06', '2026-07-06', '2026-07-07', 'Pending', NULL, NULL, 'N', 1, 'd112410057', NULL, NULL),
+(177, '2026-07-06', '2026-07-06', '2026-07-07', 'Approved', NULL, NULL, 'N', 1, 'd112410058', NULL, NULL),
+(178, '2026-07-06', '2026-07-06', '2026-07-07', 'Approved', NULL, NULL, 'N', 1, 'd032410024', 'uploads/dropoff/dropoff_178_1783282091.jpeg', 'Confirmed');
 
 -- --------------------------------------------------------
 
@@ -116,7 +123,13 @@ INSERT INTO `item` (`Item_ID`, `Item_Name`, `Item_Category`, `Item_Size`, `Quant
 (12, 'Bucket/Pail', 'Storage', 'M', 3, 0.50, 7, 165),
 (13, 'Bucket/Pail', 'Storage', 'M', 3, 0.50, 7, 166),
 (14, 'Bucket/Pail', 'Storage', 'M', 3, 0.50, 7, 167),
-(15, 'Bucket/Pail', 'Storage', 'M', 3, 0.50, 7, 168);
+(15, 'Bucket/Pail', 'Storage', 'M', 3, 0.50, 7, 168),
+(20, 'Big Bag', 'Storage', 'L', 3, 0.50, 7, 172),
+(22, 'Large Luggage', 'Storage', 'L', 3, 0.50, 7, 174),
+(23, 'Big Box', 'Storage', 'L', 1, 5.00, 7, 175),
+(24, 'Bucket/Pail', 'Storage', 'M', 2, 3.00, 7, 175),
+(26, 'Bucket/Pail', 'Storage', 'M', 3, 3.00, 7, 177),
+(27, 'Bucket/Pail', 'Storage', 'M', 3, 3.00, 7, 178);
 
 -- --------------------------------------------------------
 
@@ -154,7 +167,14 @@ INSERT INTO `payment` (`Payment_ID`, `Payment_Method`, `Payment_Status`, `Paymen
 (14, 'Online', 'N', '2026-07-02', 0.50, 159),
 (15, 'Online Banking', 'Y', '2026-07-02', 9.00, 167),
 (16, 'Online Banking', 'Y', '2026-07-02', 9.00, 167),
-(17, 'Online', 'N', '2026-07-02', 9.00, 168);
+(17, 'Online', 'N', '2026-07-02', 9.00, 168),
+(21, 'Online', 'N', '2026-07-05', 21.00, 172),
+(23, 'Online', 'N', '2026-07-05', 30.00, 174),
+(24, 'Online', 'N', '2026-07-06', 11.00, 175),
+(26, 'Online Banking', 'Y', '2026-07-05', 9.00, 177),
+(27, 'Online Banking', 'Y', '2026-07-05', 9.00, 177),
+(28, 'Online Banking', 'Y', '2026-07-05', 9.00, 178),
+(29, 'Online Banking', 'Y', '2026-07-05', 9.00, 178);
 
 -- --------------------------------------------------------
 
@@ -224,11 +244,11 @@ CREATE TABLE `storespace` (
 INSERT INTO `storespace` (`Space_ID`, `Residential_ID`, `Size`, `Status`) VALUES
 (1, 1, 50, 'Y'),
 (2, 2, 30, 'Y'),
-(3, 3, 40, 'Y'),
+(3, 3, 41, 'Y'),
 (4, 4, 61, 'Y'),
 (5, 5, 45, 'Y'),
 (6, 6, 55, 'Y'),
-(7, 7, 35, 'Y');
+(7, 7, 20, 'Y');
 
 -- --------------------------------------------------------
 
@@ -257,6 +277,7 @@ INSERT INTO `student` (`Student_ID`, `Student_Name`, `Student_Mail`, `Student_Pa
 ('d032410359', 'orang', 'D032410359@student.utem.edu.my', 'salwa123', '0199101565', 'F', 7),
 ('d032410360', 'babuntat', 'd032410360@student.utem.edu.my', 'babuntat', '0199101566', 'F', 7),
 ('d112410057', 'nurin', 'd112410057@student.utem.edu.my', 'nurin123', 'd112410057@stud', 'F', 7),
+('d112410058', 'suhaida', 'd112410058@student.utem.edu.my', 'angah123', '0139221564', 'F', 7),
 ('d112410147', 'jasmine', 'D112410147@student.utem.edu.my', 'una123', '0198253756', 'F', 7),
 ('S001', 'Faris Baharuddin', 'd032410009@student.utem.edu.my', 'password123', '0198765432', 'M', 4),
 ('S002', 'Hazim Syahmi Zaid', 'd032410283@student.utem.edu.my', 'password456', '0123456789', 'M', 4);
@@ -328,7 +349,7 @@ ALTER TABLE `student`
 -- AUTO_INCREMENT for table `booking`
 --
 ALTER TABLE `booking`
-  MODIFY `Booking_ID` int(100) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=169;
+  MODIFY `Booking_ID` int(100) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=179;
 
 --
 -- AUTO_INCREMENT for table `booking_window`
@@ -340,13 +361,13 @@ ALTER TABLE `booking_window`
 -- AUTO_INCREMENT for table `item`
 --
 ALTER TABLE `item`
-  MODIFY `Item_ID` int(100) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `Item_ID` int(100) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=28;
 
 --
 -- AUTO_INCREMENT for table `payment`
 --
 ALTER TABLE `payment`
-  MODIFY `Payment_ID` int(100) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
+  MODIFY `Payment_ID` int(100) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=30;
 
 --
 -- AUTO_INCREMENT for table `residential_college`

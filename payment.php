@@ -350,7 +350,7 @@ $conn->close();
 
     <style>
         * {
-            font-family: 'Courier New', Courier, monospace;
+            font-family: 'Arial';
             box-sizing: border-box;
         }
 
