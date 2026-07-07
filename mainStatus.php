@@ -107,6 +107,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dropoff_confirm_id'])
     exit();
 }
 
+// ── Handle Final Collection Confirmation (student confirms items were physically collected) ──
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['collected_confirm_id'])) {
+    $confirmID  = intval($_POST['collected_confirm_id']);
+    $student_id = $_SESSION['Student_ID'];
+
+    $stmt = $conn->prepare("UPDATE booking SET Booking_Status = 'Collected' WHERE Booking_ID = ? AND Student_ID = ? AND Booking_Status = 'Released'");
+    $stmt->bind_param("is", $confirmID, $student_id);
+    $stmt->execute();
+    $stmt->close();
+
+    header("Location: mainStatus.php" . (isset($_GET['sort']) ? "?sort=" . $_GET['sort'] : ""));
+    exit();
+}
+
 // ── Student ID (needed for all queries below) ─────────────────────────────────
 $student_id   = $_SESSION['Student_ID'];
 $studentIdEsc = $conn->real_escape_string($student_id);
@@ -502,6 +516,8 @@ $result = $conn->query($sql);
                     $statusBadgeClass = 'status-verification_sent';
                 } elseif ($currentStatusLower === 'confirmed') {
                     $statusBadgeClass = 'status-approved';
+                } elseif ($currentStatusLower === 'released') {
+                    $statusBadgeClass = 'status-verification_sent';
                 } else {
                     $statusBadgeClass = 'status-rejected';
                 }
@@ -571,10 +587,21 @@ $result = $conn->query($sql);
                     <div class="verif-action-note">
                          Staff has sent a pickup verification request. Please check your Notification page to confirm.
                     </div>
+                <?php elseif ($currentStatusLower === 'released'): ?>
+                    <div class="verif-action-note" style="background:#d4edda; color:#155724; border-color:rgba(21,87,36,0.3);">
+                         Staff has released your items. Please confirm once you have physically collected them.
+                    </div>
+                    <form method="POST" style="margin-top:8px;">
+                        <input type="hidden" name="collected_confirm_id" value="<?php echo $bookingID; ?>">
+                        <button type="submit" class="confirm-yes-btn"
+                            onclick="return confirm('Confirm that you have collected your items for Booking #<?php echo $bookingID; ?>? This cannot be undone.')">
+                            I've Collected My Items
+                        </button>
+                    </form>
                 <?php endif; ?>
 
                 <!-- Drop-off photo verification / proof -->
-                <?php if (!empty($row['Dropoff_Photo']) && ($row['Dropoff_Status'] ?? '') === 'Pending'): ?>
+                <?php if ($currentStatusLower !== 'collected' && !empty($row['Dropoff_Photo']) && ($row['Dropoff_Status'] ?? '') === 'Pending'): ?>
                 <div class="dropoff-confirm-box">
                     <p>Staff has uploaded a photo of your dropped-off items. Is this yours?</p>
                     <img src="<?php echo htmlspecialchars($row['Dropoff_Photo']); ?>" alt="Drop-off photo">
