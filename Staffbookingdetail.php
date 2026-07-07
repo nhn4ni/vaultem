@@ -763,5 +763,790 @@ $conn->close();
         if (!c.contains(e.target)) document.getElementById('profileSelect').classList.remove('show');
     });
 </script>
+
+<?php
+session_start();
+
+if (!isset($_SESSION['Staff_ID']) || $_SESSION['role'] !== 'staff') {
+    header("Location: login.php");
+    exit();
+}
+
+$conn = new mysqli("localhost", "root", "", "utem_accommodation");
+if ($conn->connect_error) die("Connection Failed: " . $conn->connect_error);
+
+$staff_name = $_SESSION['Staff_Name'] ?? 'Staff';
+$bid = intval($_GET['id'] ?? 0);
+
+// ── Staff working hours: drop-off photo upload & pickup verify only allowed 8AM-11AM ──
+date_default_timezone_set('Asia/Kuala_Lumpur');
+$currentTime         = date('H:i:s');
+$withinWorkingHours  = ($currentTime >= '08:00:00' && $currentTime <= '11:00:00');
+
+if (!$bid) { header("Location: staffMainStatus.php"); exit(); }
+
+// ── Storage capacity (informational only — no longer gates approval) ─────────
+$collegeRes = $conn->query("
+    SELECT s.Residential_ID,
+           COALESCE(SUM(ss.Size), 0) AS TotalCapacity
+    FROM booking b
+    JOIN student s ON b.Student_ID = s.Student_ID
+    JOIN storespace ss ON ss.Residential_ID = s.Residential_ID
+    WHERE b.Booking_ID = $bid
+    GROUP BY s.Residential_ID
+");
+$storageTotal = 0;
+$residentialID = null;
+if ($collegeRes && $collegeRes->num_rows > 0) {
+    $cr = $collegeRes->fetch_assoc();
+    $storageTotal  = (int)$cr['TotalCapacity'];
+    $residentialID = $cr['Residential_ID'];
+}
+
+$storageUsed = 0;
+if ($residentialID) {
+    $usedRes = $conn->query("
+        SELECT COALESCE(SUM(i.Quantity), 0) AS used
+        FROM item i
+        JOIN booking b  ON i.Booking_ID  = b.Booking_ID
+        JOIN student s  ON b.Student_ID  = s.Student_ID
+        WHERE LOWER(b.Booking_Status) = 'approved'
+          AND s.Residential_ID = '$residentialID'
+    ");
+    if ($usedRes) $storageUsed = (int)$usedRes->fetch_assoc()['used'];
+}
+
+$storagePct = ($storageTotal > 0) ? round(($storageUsed / $storageTotal) * 100) : 0;
+
+// ── Handle POST ───────────────────────────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Approve — every pending booking now requires manual staff review
+    if (isset($_POST['approve'])) {
+        $stmt = $conn->prepare("UPDATE booking SET Booking_Status = 'Approved' WHERE Booking_ID = ? AND LOWER(Booking_Status) = 'pending'");
+        $stmt->bind_param("i", $bid); $stmt->execute(); $stmt->close();
+        header("Location: staffBookingDetail.php?id=$bid&msg=approved"); exit();
+    }
+    // Reject — a reason AND an evidence photo are now mandatory, both shown to the student
+    if (isset($_POST['reject'])) {
+        $reason = trim($_POST['reject_reason'] ?? '');
+
+        if ($reason === '') {
+            header("Location: staffBookingDetail.php?id=$bid&msg=reject_no_reason"); exit();
+        }
+
+        $photoUploaded = isset($_FILES['reject_photo']) && $_FILES['reject_photo']['error'] === 0;
+        if (!$photoUploaded) {
+            header("Location: staffBookingDetail.php?id=$bid&msg=reject_no_photo"); exit();
+        }
+
+        $ext     = strtolower(pathinfo($_FILES['reject_photo']['name'], PATHINFO_EXTENSION));
+        $allowed = ['jpg','jpeg','png','gif','webp'];
+        if (!in_array($ext, $allowed)) {
+            header("Location: staffBookingDetail.php?id=$bid&msg=reject_bad_photo"); exit();
+        }
+
+        $uploadDir = 'uploads/rejections/';
+        if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+        $filename = 'reject_' . $bid . '_' . time() . '.' . $ext;
+
+        if (!move_uploaded_file($_FILES['reject_photo']['tmp_name'], $uploadDir . $filename)) {
+            header("Location: staffBookingDetail.php?id=$bid&msg=reject_bad_photo"); exit();
+        }
+        $photoPath = $uploadDir . $filename;
+
+        $stmt = $conn->prepare("UPDATE booking SET Booking_Status = 'Rejected', Rejection_Reason = ?, Rejection_Photo = ? WHERE Booking_ID = ? AND LOWER(Booking_Status) = 'pending'");
+        $stmt->bind_param("ssi", $reason, $photoPath, $bid); $stmt->execute(); $stmt->close();
+
+        // ── NEW: Restore reserved space back to storespace since this booking is no longer active ──
+        $getItems = $conn->prepare("SELECT SUM(Quantity) AS total, Space_ID FROM item WHERE Booking_ID = ? GROUP BY Space_ID");
+        $getItems->bind_param("i", $bid);
+        $getItems->execute();
+        $itemsResult = $getItems->get_result();
+        while ($itemsRow = $itemsResult->fetch_assoc()) {
+            $rejectedQty = (int)$itemsRow['total'];
+            $spaceID     = (int)$itemsRow['Space_ID'];
+
+            $restoreSpace = $conn->prepare("UPDATE storespace SET Size = Size + ? WHERE Space_ID = ?");
+            $restoreSpace->bind_param("ii", $rejectedQty, $spaceID);
+            $restoreSpace->execute();
+            $restoreSpace->close();
+        }
+        $getItems->close();
+
+        header("Location: staffBookingDetail.php?id=$bid&msg=rejected"); exit();
+    }
+    // Confirm the uploaded drop-off photo is correct, then send it to the student for verification
+    if (isset($_POST['confirm_dropoff'])) {
+        $stmt = $conn->prepare("UPDATE booking SET Dropoff_Status = 'Pending' WHERE Booking_ID = ? AND Dropoff_Status = 'Uploaded'");
+        $stmt->bind_param("i", $bid); $stmt->execute(); $stmt->close();
+        header("Location: staffBookingDetail.php?id=$bid&msg=sent_to_student"); exit();
+    }
+    if (isset($_POST['verify'])) {
+        if (!$withinWorkingHours) {
+            header("Location: staffBookingDetail.php?id=$bid&msg=outside_hours"); exit();
+        }
+        $confirmCheck = $conn->query("SELECT Dropoff_Status FROM booking WHERE Booking_ID = $bid LIMIT 1");
+        $confirmed    = $confirmCheck && $confirmCheck->num_rows > 0 && $confirmCheck->fetch_assoc()['Dropoff_Status'] === 'Confirmed';
+        if (!$confirmed) {
+            header("Location: staffBookingDetail.php?id=$bid&msg=no_photo"); exit();
+        }
+        $stmt = $conn->prepare("UPDATE booking SET Booking_Status = 'Verification_Sent' WHERE Booking_ID = ? AND LOWER(Booking_Status) = 'approved'");
+        $stmt->bind_param("i", $bid); $stmt->execute(); $stmt->close();
+        header("Location: staffBookingDetail.php?id=$bid&msg=verified"); exit();
+    }
+    // Drop-off photo upload — only allowed once payment is completed, and only during working hours (8AM-11AM)
+    if (isset($_POST['upload_dropoff'])) {
+        if (!$withinWorkingHours) {
+            header("Location: staffBookingDetail.php?id=$bid&msg=outside_hours"); exit();
+        }
+        $payCheck = $conn->query("SELECT UPPER(Payment_Status) AS ps FROM payment WHERE Booking_ID = $bid LIMIT 1");
+        $paidNow  = $payCheck && $payCheck->num_rows > 0 && $payCheck->fetch_assoc()['ps'] === 'Y';
+
+        if (!$paidNow) {
+            header("Location: staffBookingDetail.php?id=$bid&msg=not_paid"); exit();
+        }
+
+        if (isset($_FILES['dropoff_photo']) && $_FILES['dropoff_photo']['error'] === 0) {
+            $ext     = strtolower(pathinfo($_FILES['dropoff_photo']['name'], PATHINFO_EXTENSION));
+            $allowed = ['jpg','jpeg','png','gif','webp'];
+            if (in_array($ext, $allowed)) {
+                $uploadDir = 'uploads/dropoff/';
+                if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+                $filename = 'dropoff_' . $bid . '_' . time() . '.' . $ext;
+                if (move_uploaded_file($_FILES['dropoff_photo']['tmp_name'], $uploadDir . $filename)) {
+                    $photoPath = $uploadDir . $filename;
+                    $stmt = $conn->prepare("UPDATE booking SET Dropoff_Photo = ?, Dropoff_Status = 'Uploaded' WHERE Booking_ID = ?");
+                    $stmt->bind_param("si", $photoPath, $bid);
+                    $stmt->execute();
+                    $stmt->close();
+                }
+            }
+        }
+        header("Location: staffBookingDetail.php?id=$bid&msg=uploaded"); exit();
+    }
+}
+
+// ── Fetch booking ─────────────────────────────────────────────────────────────
+$bStmt = $conn->prepare("
+    SELECT b.*, s.Student_Name, s.Student_Mail, s.Student_PhoneNo,
+           rc.Residential_Block,
+           (SELECT COALESCE(SUM(i.Quantity), 0) FROM item i WHERE i.Booking_ID = b.Booking_ID)            AS TotalItem,
+           (SELECT COALESCE(SUM(i.Quantity * i.Price), 0) FROM item i WHERE i.Booking_ID = b.Booking_ID)  AS TotalFee,
+           p.Payment_Status, p.Payment_Method, p.Payment_Date, p.Amount
+    FROM booking b
+    LEFT JOIN student s  ON b.Student_ID      = s.Student_ID
+    LEFT JOIN residential_college rc ON s.Residential_ID = rc.Residential_ID
+    LEFT JOIN (SELECT * FROM payment WHERE Booking_ID = ? LIMIT 1) p ON b.Booking_ID = p.Booking_ID
+    WHERE b.Booking_ID = ?
+");
+$bStmt->bind_param("ii", $bid, $bid);
+$bStmt->execute();
+$bRes = $bStmt->get_result();
+if ($bRes->num_rows === 0) { header("Location: staffMainStatus.php"); exit(); }
+$b = $bRes->fetch_assoc();
+$bStmt->close();
+
+// ── Fetch items ───────────────────────────────────────────────────────────────
+$iRes = $conn->query("SELECT Item_Name, Quantity, Price FROM item WHERE Booking_ID = $bid");
+
+$bstat  = strtolower($b['Booking_Status']);
+$isPrio = $b['Booking_Priority'] === 'Y';
+$isPaid = in_array(strtolower($b['Payment_Status'] ?? ''), ['y','paid']);
+
+// ── Fix 0000-00-00 dates ──────────────────────────────────────────────────────
+$bookingDate = (!empty($b['Booking_Date']) && $b['Booking_Date'] !== '0000-00-00')
+               ? $b['Booking_Date'] : 'N/A';
+$paymentDate = (!empty($b['Payment_Date']) && $b['Payment_Date'] !== '0000-00-00')
+               ? $b['Payment_Date'] : 'N/A';
+
+// ── Verification state ────────────────────────────────────────────────────────
+$bs               = $b['Booking_Status'];
+$studentConfirmed = in_array($bs, ['Confirmed','Collected']);
+$verifSent        = ($bs === 'Verification_Sent');
+
+// ── Drop-off photo & verification status (from DB) ────────────────────────────
+$uploadedPhoto = $b['Dropoff_Photo'] ?? null;
+$dropoffStatus = $b['Dropoff_Status'] ?? null; // null | 'Pending' | 'Confirmed' | 'Rejected'
+
+$conn->close();
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VaulteM – Booking #<?php echo $bid; ?></title>
+    <link rel="stylesheet" href="status.css">
+    <link rel="stylesheet" href="mobile.css">
+    <style>
+        .back-btn { background: none; border: none; color: #241253; font-size: 1rem; font-weight: bold; cursor: pointer; padding: 14px 0 4px 0; display: block; }
+        .back-btn:hover { text-decoration: underline; transform: none; }
+
+        .booking-header { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }
+        .booking-id-label { font-size: 1.1rem; font-weight: 800; color: #E8E9DE; }
+
+        .status-badge { display: inline-block; padding: 4px 14px; border-radius: 12px; font-weight: bold; font-size: 0.82rem; }
+        .status-pending           { background: #fff3cd; color: #856404; }
+        .status-approved          { background: #d4edda; color: #155724; }
+        .status-rejected          { background: #f8d7da; color: #721c24; }
+        .status-verification_sent { background: #cfe2ff; color: #084298; }
+        .status-confirmed         { background: #d4edda; color: #155724; }
+        .status-collected         { background: #e2e3e5; color: #495057; }
+        .priority-badge { background: #dc3545; color: #fff; font-size: 0.72rem; padding: 3px 10px; border-radius: 10px; font-weight: bold; }
+
+        /* ── Accordion ── */
+        .accordion { margin-bottom: 16px; width: 97%; }
+
+        .accordion-toggle {
+            width: 100%;
+            background: #084298;
+            color: #fff;
+            border: none;
+            border-radius: 12px;
+            padding: 13px 18px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            text-align: left;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-family: inherit;
+            transition: background 0.2s;
+        }
+        .accordion-toggle:hover { background: #0a58ca; }
+        .accordion-toggle.open  { border-radius: 12px 12px 0 0; }
+
+        .accordion-arrow { font-size: 1rem; transition: transform 0.3s; display: inline-block; }
+        .accordion-toggle.open .accordion-arrow { transform: rotate(180deg); }
+
+        .accordion-body {
+            display: none;
+            background: #1e1b4b;
+            border: 2px solid #3b5bdb;
+            border-top: none;
+            border-radius: 0 0 12px 12px;
+            padding: 18px 20px;
+        }
+        .accordion-body.open { display: block; }
+
+        .field-row { display: flex; align-items: baseline; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.07); font-size: 0.9rem; }
+        .field-row:last-child { border-bottom: none; }
+        .field-label { color: #a0a8d0; min-width: 140px; font-size: 0.85rem; }
+        .field-value { color: #E8E9DE; font-weight: 500; }
+
+        .items-table { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 0.85rem; }
+        .items-table th { text-align: left; color: #a0a8d0; font-size: 0.72rem; text-transform: uppercase; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.12); }
+        .items-table td { padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.07); color: #E8E9DE; }
+        .items-table tr:last-child td { border-bottom: none; }
+
+        /* ── Drop-off / Pickup verification rows ── */
+        .verif-row {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 16px;
+            padding: 16px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+        }
+        .verif-row:last-child { border-bottom: none; }
+
+        .verif-left h5 { margin: 0 0 5px; font-size: 0.92rem; font-weight: 700; color: #E8E9DE; }
+        .verif-left p  { margin: 3px 0; font-size: 0.8rem; color: #a0a8d0; }
+        .verif-left .note { font-size: 0.75rem; color: #8b82b5; font-style: italic; margin-top: 6px; }
+
+        .verif-right { display: flex; flex-direction: column; gap: 10px; align-items: flex-end; }
+
+        /* Photo preview */
+        .photo-preview {
+            width: 130px; height: 95px;
+            border: 2px dashed rgba(255,255,255,0.2);
+            border-radius: 10px;
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden;
+            background: rgba(255,255,255,0.05);
+            font-size: 0.72rem; color: #8b82b5; text-align: center;
+            line-height: 1.4;
+        }
+        .photo-preview img { width: 100%; height: 100%; object-fit: cover; }
+
+        /* Upload label */
+        .upload-label {
+            background: #241253;
+            color: #E8E9DE;
+            padding: 8px 18px;
+            border-radius: 16px;
+            font-size: 0.82rem;
+            font-weight: bold;
+            cursor: pointer;
+            display: inline-block;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        .upload-label:hover { background: #37216d; transform: translateY(-1px); }
+
+        /* Verify button */
+        .verify-btn {
+            background: #198754;
+            color: #fff;
+            border: none;
+            padding: 9px 22px;
+            border-radius: 16px;
+            font-weight: bold;
+            font-size: 0.85rem;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+        .verify-btn:hover    { background: #157347; transform: translateY(-1px); }
+        .verify-btn:disabled { background: #555; cursor: not-allowed; opacity: 0.55; transform: none; }
+
+        .confirmed-tag { background: #d4edda; color: #155724; font-size: 0.75rem; font-weight: 700; padding: 4px 12px; border-radius: 10px; }
+        .sent-tag      { background: #cfe2ff; color: #084298; font-size: 0.75rem; font-weight: 700; padding: 4px 12px; border-radius: 10px; }
+
+        /* Action buttons */
+        .action-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; width: 97%; }
+        .btn-approve { background: #198754; color: #fff; border: none; padding: 11px 26px; border-radius: 20px; font-weight: bold; cursor: pointer; font-size: 0.9rem; font-family: inherit; }
+        .btn-approve:hover { background: #157347; transform: translateY(-1px); }
+        .btn-reject  { background: #dc3545; color: #fff; border: none; padding: 11px 26px; border-radius: 20px; font-weight: bold; cursor: pointer; font-size: 0.9rem; font-family: inherit; }
+        .btn-reject:hover  { background: #bb2d3b; transform: translateY(-1px); }
+        .btn-verify  { background: #084298; color: #fff; border: none; padding: 11px 26px; border-radius: 20px; font-weight: bold; cursor: pointer; font-size: 0.9rem; font-family: inherit; }
+        .btn-verify:hover  { background: #0a58ca; transform: translateY(-1px); }
+
+        .msg-banner { padding: 10px 16px; border-radius: 10px; font-size: 0.85rem; font-weight: 600; margin-bottom: 16px; }
+        .msg-success { background: rgba(34,197,94,0.15); color: #22c55e; border: 1px solid rgba(34,197,94,0.3); }
+        .msg-info    { background: rgba(245,158,11,0.12); color: #f59e0b; border: 1px solid rgba(245,158,11,0.3); }
+
+        /* Reject modal */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 200; justify-content: center; align-items: center; }
+        .modal-overlay.show { display: flex; }
+        .modal-box { background: #f1f0ea; color: #1e1b4b; border-radius: 20px; padding: 28px; width: 90%; max-width: 400px; }
+        .modal-box h3 { margin-bottom: 12px; }
+        .modal-box textarea { width: 100%; border-radius: 10px; border: 1px solid #ccc; padding: 10px; font-size: 0.9rem; resize: vertical; min-height: 80px; font-family: inherit; }
+        .modal-box .required-note { font-size: 0.75rem; color: #dc3545; margin-top: 6px; }
+        .modal-btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; }
+        .btn-cancel-modal { background: none; border: 1px solid #ccc; color: #666; padding: 8px 18px; border-radius: 20px; cursor: pointer; font-family: inherit; }
+
+        .capacity-info {
+            width: 97%;
+            background: rgba(124,92,252,0.08);
+            border: 1px solid rgba(124,92,252,0.25);
+            border-radius: 14px;
+            padding: 12px 18px;
+            margin-bottom: 14px;
+            font-size: 0.82rem;
+            color: #E8E9DE;
+        }
+
+        #profileContainer { position: relative; display: inline-block; cursor: pointer; }
+        #userImage { vertical-align: middle; margin-left: 5px; }
+        #profileSelect { display: none; position: absolute; right: 0; top: 25px; background-color: #241253; border: 1px solid #E8E9DE; border-radius: 8px; min-width: 130px; z-index: 10; }
+        #profileSelect.show { display: flex; flex-direction: column; }
+        #profileSelect button { background: none; border: none; color: #E8E9DE; padding: 10px; text-align: left; width: 100%; cursor: pointer; font-size: 0.85rem; }
+        #profileSelect button:hover { background-color: rgba(232,233,222,0.2); }
+
+        @media (max-width: 600px) {
+            .verif-row { flex-direction: column; }
+            .verif-right { align-items: flex-start; }
+        }
+    </style>
+</head>
+<body>
+<div id="wrapper">
+
+    <div class="leftcontainer">
+        <header>
+            <h1 onclick="window.location.href='staffMainStatus.php'" style="cursor:pointer;">VaulteM</h1>
+        </header>
+        <button type="button" id="booking" onclick="window.location.href='Staffmainstatus.php'">
+            Manage Bookings
+        </button>
+    </div>
+
+    <div class="rightcontainer">
+
+        <div id="userName">
+            Welcome,
+            <span id="currentName"><?php echo htmlspecialchars($staff_name); ?></span>
+            <span id="profileContainer">
+                <img id="userImage" src="image/user.png" width="20px" height="20px" onclick="profileMenu()">
+                <div id="profileSelect">
+                    <button onclick="showProfile()">Profile</button>
+                    <button onclick="showLog()">Logout</button>
+                </div>
+            </span>
+        </div>
+
+        <button class="back-btn" onclick="history.back()">&#60; Back</button>
+        <h1>Booking Details</h1>
+
+        <?php if (isset($_GET['msg'])): ?>
+        <div class="msg-banner <?php echo in_array($_GET['msg'], ['approved','verified','uploaded','photo_cleared']) ? 'msg-success' : 'msg-info'; ?>">
+            <?php
+                $msgs = [
+                    'approved' => ' Booking approved.',
+                    'rejected' => ' Booking rejected. The student can now see your reason and evidence photo on their dashboard.',
+                    'reject_no_reason' => 'You must provide a reason before rejecting this booking.',
+                    'reject_no_photo'  => 'You must upload an evidence photo (e.g. the item next to a measuring tape) before rejecting this booking.',
+                    'reject_bad_photo' => 'That photo could not be uploaded. Please use a JPG, PNG, GIF, or WEBP file and try again.',
+                    'not_paid'  => 'The student has not paid yet. The drop-off photo can only be uploaded after payment is completed.',
+                    'sent_to_student' => 'Photo sent to student for verification.',
+                    'outside_hours' => 'This action is only available during working hours (8:00 AM - 11:00 AM).',
+                    'verified' => ' Verification request sent to student.',
+                    'uploaded'      => 'Drop-off photo uploaded successfully.',
+                    'photo_cleared' => 'Photo removed successfully.',
+                    'no_photo'      => 'The drop-off photo must be uploaded and confirmed by the student before sending verification.',
+                ];
+                echo $msgs[$_GET['msg']] ?? '';
+            ?>
+        </div>
+        <?php endif; ?>
+
+        <!-- Booking ID + status -->
+        <div class="booking-header">
+            <span class="booking-id-label">Booking #<?php echo $bid; ?></span>
+            <?php if ($isPrio): ?><span class="priority-badge">EMERGENCY</span><?php endif; ?>
+            <span class="status-badge status-<?php echo $bstat; ?>"><?php echo htmlspecialchars($b['Booking_Status']); ?></span>
+        </div>
+
+        <!-- ── 1. Student Details ── -->
+        <div class="accordion">
+            <button class="accordion-toggle open" onclick="toggleSection(this)">
+                Student Details <span class="accordion-arrow">▼</span>
+            </button>
+            <div class="accordion-body open">
+                <div class="field-row">
+                    <span class="field-label">Student Name</span>
+                    <span class="field-value"><?php echo htmlspecialchars($b['Student_Name']); ?></span>
+                </div>
+                <div class="field-row">
+                    <span class="field-label">Student ID</span>
+                    <span class="field-value"><?php echo htmlspecialchars($b['Student_ID']); ?></span>
+                </div>
+                <div class="field-row">
+                    <span class="field-label">Email</span>
+                    <span class="field-value"><?php echo htmlspecialchars($b['Student_Mail']); ?></span>
+                </div>
+                <div class="field-row">
+                    <span class="field-label">Phone Number</span>
+                    <span class="field-value"><?php echo htmlspecialchars($b['Student_PhoneNo'] ?? 'N/A'); ?></span>
+                </div>
+                <div class="field-row">
+                    <span class="field-label">College</span>
+                    <span class="field-value"><?php echo htmlspecialchars($b['Residential_Block'] ?? 'N/A'); ?></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── 2. Booking Details ── -->
+        <div class="accordion">
+            <button class="accordion-toggle open" onclick="toggleSection(this)">
+                Booking Details <span class="accordion-arrow">▼</span>
+            </button>
+            <div class="accordion-body open">
+                <div class="field-row">
+                    <span class="field-label">Booked On</span>
+                    <span class="field-value"><?php echo htmlspecialchars($bookingDate); ?></span>
+                </div>
+                <div class="field-row">
+                    <span class="field-label">Drop-off Date</span>
+                    <span class="field-value"><?php echo htmlspecialchars($b['DropOff_Date']); ?></span>
+                </div>
+                <div class="field-row">
+                    <span class="field-label">Pick-up Date</span>
+                    <span class="field-value"><?php echo htmlspecialchars($b['Pickup_Date']); ?></span>
+                </div>
+                <div class="field-row">
+                    <span class="field-label">Total Items</span>
+                    <span class="field-value"><?php echo $b['TotalItem']; ?></span>
+                </div>
+                <div class="field-row">
+                    <span class="field-label">Total Fee</span>
+                    <span class="field-value">RM <?php echo number_format((float)$b['TotalFee'], 2); ?></span>
+                </div>
+                <?php if ($bstat === 'rejected' && !empty($b['Rejection_Reason'])): ?>
+                <div class="field-row">
+                    <span class="field-label">Rejection Reason</span>
+                    <span class="field-value" style="color:#f8a5ad;"><?php echo htmlspecialchars($b['Rejection_Reason']); ?></span>
+                </div>
+                <?php endif; ?>
+                <?php if ($bstat === 'rejected' && !empty($b['Rejection_Photo'])): ?>
+                <div class="field-row" style="align-items:flex-start;">
+                    <span class="field-label">Evidence Photo</span>
+                    <span class="field-value">
+                        <img src="<?php echo htmlspecialchars($b['Rejection_Photo']); ?>" alt="Rejection evidence" style="max-width:240px; border-radius:10px; display:block; margin-top:4px;">
+                    </span>
+                </div>
+                <?php endif; ?>
+                <?php if ($iRes && $iRes->num_rows > 0): ?>
+                <table class="items-table" style="margin-top:14px;">
+                    <thead><tr><th>Item</th><th>Qty</th><th>Price (RM)</th><th>Subtotal</th></tr></thead>
+                    <tbody>
+                    <?php while ($it = $iRes->fetch_assoc()): ?>
+                    <tr>
+                        <td><?php echo htmlspecialchars($it['Item_Name']); ?></td>
+                        <td><?php echo $it['Quantity']; ?></td>
+                        <td><?php echo number_format((float)$it['Price'], 2); ?></td>
+                        <td>RM <?php echo number_format((float)($it['Quantity'] * $it['Price']), 2); ?></td>
+                    </tr>
+                    <?php endwhile; ?>
+                    </tbody>
+                </table>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- ── 3. Payment Details ── -->
+        <div class="accordion">
+            <button class="accordion-toggle open" onclick="toggleSection(this)">
+                Payment Details <span class="accordion-arrow">▼</span>
+            </button>
+            <div class="accordion-body open">
+                <div class="field-row">
+                    <span class="field-label">Payment Status</span>
+                    <span class="field-value">
+                        <?php
+                            $ps = strtolower($b['Payment_Status'] ?? '');
+                            echo $isPaid ? ' Paid' : (($ps === 'p' || $ps === 'pending') ? 'Pay Later' : 'Unpaid');
+                        ?>
+                    </span>
+                </div>
+                <div class="field-row">
+                    <span class="field-label">Payment Method</span>
+                    <span class="field-value"><?php echo htmlspecialchars($b['Payment_Method'] ?? 'N/A'); ?></span>
+                </div>
+                <div class="field-row">
+                    <span class="field-label">Payment Date</span>
+                    <span class="field-value"><?php echo htmlspecialchars($paymentDate); ?></span>
+                </div>
+                <div class="field-row">
+                    <span class="field-label">Amount Paid</span>
+                    <span class="field-value">RM <?php echo number_format((float)($b['Amount'] ?? 0), 2); ?></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── 4. Drop-off / Verification ── -->
+        <div class="accordion">
+            <button class="accordion-toggle open" onclick="toggleSection(this)">
+                Drop-off / Verification <span class="accordion-arrow">▼</span>
+            </button>
+            <div class="accordion-body open">
+
+                <!-- DROP OFF row -->
+                <div class="verif-row">
+                    <div class="verif-left">
+                        <h5>Drop off</h5>
+                        <p>Staff must upload student's items photo as proof.</p>
+                        <?php if ($dropoffStatus === 'Confirmed'): ?>
+                            <p style="color:#22c55e; font-size:0.78rem; margin-top:6px; font-weight:600;"> Confirmed by student — kept as reference until pickup.</p>
+                        <?php elseif ($dropoffStatus === 'Rejected'): ?>
+                            <p style="color:#dc3545; font-size:0.78rem; margin-top:6px; font-weight:600;"> Student says this is not their item. Please recheck and re-upload.</p>
+                        <?php elseif ($dropoffStatus === 'Pending'): ?>
+                            <p style="color:#f59e0b; font-size:0.78rem; margin-top:6px; font-weight:600;"> Awaiting student verification.</p>
+                        <?php elseif ($dropoffStatus === 'Uploaded'): ?>
+                            <p style="color:#cfe2ff; font-size:0.78rem; margin-top:6px; font-weight:600;"> Photo uploaded. Review it, then send to the student.</p>
+                        <?php elseif (!$isPaid): ?>
+                            <p style="color:#8b82b5; font-size:0.78rem; margin-top:6px; font-style:italic;">Upload is available once the student has paid.</p>
+                        <?php endif; ?>
+                    </div>
+                    <div class="verif-right">
+                        <!-- Preview box -->
+                        <div class="photo-preview" id="photo-preview-<?php echo $bid; ?>">
+                            <?php if ($uploadedPhoto): ?>
+                                <img src="<?php echo htmlspecialchars($uploadedPhoto); ?>" alt="Drop-off proof">
+                            <?php else: ?>
+                                <br>No photo yet
+                            <?php endif; ?>
+                        </div>
+
+                        <?php if ($dropoffStatus === 'Uploaded'): ?>
+                            <!-- Staff reviews the photo, then confirms it's correct to send to student -->
+                            <form method="POST" style="display:inline;">
+                                <button type="submit" name="confirm_dropoff" class="verify-btn"
+                                    onclick="return confirm('Send this photo to the student for verification?')">
+                                     Correct — Send to Student
+                                </button>
+                            </form>
+                        <?php endif; ?>
+
+                        <!-- Upload form: hidden once confirmed, otherwise requires payment + working hours -->
+                        <?php if ($dropoffStatus !== 'Confirmed'): ?>
+                            <?php if ($isPaid && $withinWorkingHours): ?>
+                            <form method="POST" enctype="multipart/form-data" style="display:inline;">
+                                <input type="hidden" name="upload_dropoff" value="1">
+                                <input type="file" name="dropoff_photo"
+                                       id="dropoff-file-<?php echo $bid; ?>"
+                                       accept="image/*" style="display:none;"
+                                       onchange="previewPhoto(this, <?php echo $bid; ?>); this.form.submit();">
+                                <label for="dropoff-file-<?php echo $bid; ?>" class="upload-label">
+                                     <?php echo $dropoffStatus === 'Rejected' ? 'Re-upload Photo' : ($dropoffStatus === 'Uploaded' ? 'Re-upload' : 'Upload Photo'); ?>
+                                </label>
+                            </form>
+                            <?php elseif (!$isPaid): ?>
+                                <button class="upload-label" disabled style="opacity:0.5; cursor:not-allowed; border:none;" title="Student must pay first">
+                                    Upload Photo
+                                </button>
+                            <?php else: ?>
+                                <button class="upload-label" disabled style="opacity:0.5; cursor:not-allowed; border:none;" title="Only available 8:00 AM - 11:00 AM">
+                                    Upload Photo
+                                </button>
+                            <?php endif; ?>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <!-- PICKUP / VERIFY row -->
+                <div class="verif-row">
+                    <div class="verif-left">
+                        <h5>Pickup</h5>
+                        <?php if ($studentConfirmed): ?>
+                            <p style="color:#22c55e; font-weight:600;"> Student has confirmed collection.</p>
+                        <?php elseif ($verifSent): ?>
+                            <p style="color:#cfe2ff;"> Verification sent — awaiting student confirmation.</p>
+                        <?php else: ?>
+                            <p>Send verification request to student before releasing items.</p>
+                            <p class="note">* Verify button only active when booking is Approved.</p>
+                        <?php endif; ?>
+                    </div>
+                    <div class="verif-right">
+                        <?php if ($studentConfirmed): ?>
+                            <span class="confirmed-tag">Student Confirmed</span>
+                        <?php elseif ($verifSent): ?>
+                            <span class="sent-tag">Awaiting Student</span>
+                        <?php elseif ($bstat === 'approved' && $dropoffStatus === 'Confirmed' && $withinWorkingHours): ?>
+                            <form method="POST" style="display:inline;">
+                                <button type="submit" name="verify" class="verify-btn"
+                                    onclick="return confirm('Send verification request to student for Booking #<?php echo $bid; ?>?')">
+                                    Verify
+                                </button>
+                            </form>
+                        <?php elseif ($bstat === 'approved' && $dropoffStatus === 'Confirmed' && !$withinWorkingHours): ?>
+                            <button class="verify-btn" disabled title="Only available 8:00 AM - 11:00 AM">
+                                Verify
+                            </button>
+                            <p style="font-size:0.72rem; color:#f59e0b; text-align:right; margin-top:4px;">
+                                Only available 8:00 AM - 11:00 AM
+                            </p>
+                        <?php elseif ($bstat === 'approved' && $dropoffStatus !== 'Confirmed'): ?>
+                            <button class="verify-btn" disabled title="Drop-off photo must be confirmed by the student first">
+                                Verify
+                            </button>
+                            <p style="font-size:0.72rem; color:#f59e0b; text-align:right; margin-top:4px;">
+                                <?php
+                                    if ($dropoffStatus === 'Uploaded') echo 'Send the photo to the student first';
+                                    elseif ($dropoffStatus === 'Pending') echo 'Waiting for student to confirm drop-off photo';
+                                    elseif ($dropoffStatus === 'Rejected') echo 'Student rejected the photo — re-upload and resend';
+                                    else echo 'Upload drop-off photo first';
+                                ?>
+                            </p>
+                        <?php else: ?>
+                            <button class="verify-btn" disabled title="Booking must be Approved first">
+                                Verify
+                            </button>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ── Action buttons ── -->
+        <?php if ($bstat === 'pending'): ?>
+        <div class="capacity-info">
+            Storage in this college is currently at <strong><?php echo $storagePct; ?>%</strong> capacity.
+            Every booking now requires manual review — please check the details above before deciding.
+        </div>
+        <div class="action-row">
+            <form method="POST" style="display:inline">
+                <button type="submit" name="approve" class="btn-approve"> Approve</button>
+            </form>
+            <button class="btn-reject" onclick="document.getElementById('rejectModal').classList.add('show')"> Reject</button>
+        </div>
+        <?php endif; ?>
+
+    </div>
+</div>
+
+<!-- Reject modal -->
+<div class="modal-overlay" id="rejectModal">
+    <div class="modal-box">
+        <h3>Reject Booking #<?php echo $bid; ?></h3>
+        <form method="POST" id="rejectForm" enctype="multipart/form-data">
+            <textarea name="reject_reason" id="reject_reason" placeholder="Explain why this booking is being rejected — the student will see this." required></textarea>
+            <p class="required-note">* A reason is required and will be shown to the student.</p>
+
+            <label for="reject_photo" class="upload-label" style="margin-top:10px; text-align:center;">
+                 Attach Evidence Photo
+            </label>
+            <input type="file" name="reject_photo" id="reject_photo" accept="image/*" required
+                   style="display:block; margin-top:10px; font-size:0.8rem;">
+            <p class="required-note">* A clear photo is required — e.g. the item placed next to a measuring tape,
+                so the mismatch is unambiguous and the student cannot dispute what was found.</p>
+
+            <div class="modal-btns">
+                <button type="button" class="btn-cancel-modal"
+                    onclick="document.getElementById('rejectModal').classList.remove('show')">Cancel</button>
+                <button type="submit" name="reject" class="btn-reject">Confirm Reject</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Logout popup -->
+<div id="logoutPopup" class="hidden">
+    <div id="logoutText">
+        <p>Are you sure you want to logout?</p>
+        <div id="logoutButton">
+            <button id="yesBTN" onclick="window.location.href='logout.php'">Yes</button>
+            <button id="noBTN" onclick="showLog()">No</button>
+        </div>
+    </div>
+</div>
+
+<!-- Profile popup -->
+<div id="profilePopup" class="hidden">
+    <div id="profileShortDetails">
+        <h3>Profile</h3>
+        <p>Name  : <span><?php echo htmlspecialchars($staff_name); ?></span></p>
+        <p>Email : <span><?php echo htmlspecialchars($_SESSION['Email'] ?? ''); ?></span></p>
+        <div id="profileBTN">
+            <button id="close" onclick="showProfile()">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    function toggleSection(btn) {
+        btn.classList.toggle('open');
+        btn.nextElementSibling.classList.toggle('open');
+    }
+
+    function previewPhoto(input, bid) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const box = document.getElementById('photo-preview-' + bid);
+                box.innerHTML = '<img src="' + e.target.result + '" alt="preview">';
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    function profileMenu() { document.getElementById('profileSelect').classList.toggle('show'); }
+    function showProfile() { document.getElementById('profilePopup').classList.toggle('hidden'); }
+    function showLog()     { document.getElementById('logoutPopup').classList.toggle('hidden'); }
+
+    document.getElementById('rejectModal').addEventListener('click', function(e) {
+        if (e.target === this) this.classList.remove('show');
+    });
+    document.addEventListener('click', function(e) {
+        const c = document.getElementById('profileContainer');
+        if (!c.contains(e.target)) document.getElementById('profileSelect').classList.remove('show');
+    });
+</script>
+</body>
+</html>
 </body>
 </html>
