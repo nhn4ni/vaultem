@@ -20,7 +20,8 @@ $withinWorkingHours = ($currentTime >= '08:00:00' && $currentTime <= '11:00:00')
 // Approved           → approved, not yet sent
 // Verification_Sent  → staff sent request to student
 // Confirmed          → student confirmed, ready for release
-// Collected          → staff released items
+// Released           → staff released items, awaiting student's final collection confirmation
+// Collected          → student confirmed they collected their items (cycle complete)
 
 // ── Handle send verification ──────────────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['send_verify_id'])) {
@@ -63,10 +64,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['resend_verify_id'])) 
     exit();
 }
 
-// ── Handle release ────────────────────────────────────────────────────────────
+// ── Handle release (staff hands over items — now requires student to confirm collection before the cycle truly ends) ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['release_id'])) {
     $bid = intval($_POST['release_id']);
-    $stmt = $conn->prepare("UPDATE booking SET Booking_Status = 'Collected' WHERE Booking_ID = ? AND Booking_Status = 'Confirmed'");
+    $stmt = $conn->prepare("UPDATE booking SET Booking_Status = 'Released' WHERE Booking_ID = ? AND Booking_Status = 'Confirmed'");
     $stmt->bind_param("i", $bid);
     $stmt->execute();
     $stmt->close();
@@ -77,10 +78,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['release_id'])) {
 // ── Filter ────────────────────────────────────────────────────────────────────
 $filter = $_GET['filter'] ?? 'all';
 
-$filterWhere = "AND b.Booking_Status IN ('Approved','Verification_Sent','Confirmed')";
+$filterWhere = "AND b.Booking_Status IN ('Approved','Verification_Sent','Confirmed','Released')";
 if ($filter === 'notsent')   $filterWhere = "AND LOWER(b.Booking_Status) = 'approved'";
 if ($filter === 'pending')   $filterWhere = "AND b.Booking_Status = 'Verification_Sent'";
 if ($filter === 'confirmed') $filterWhere = "AND b.Booking_Status = 'Confirmed'";
+if ($filter === 'released')  $filterWhere = "AND b.Booking_Status = 'Released'";
 
 // ── Fetch bookings ────────────────────────────────────────────────────────────
 $bookings = $conn->query("
@@ -109,6 +111,9 @@ $statPending = $r2 ? $r2->fetch_assoc()['c'] : 0;
 $r3 = $conn->query("SELECT COUNT(*) AS c FROM booking WHERE Booking_Status = 'Confirmed'");
 $statConfirmed = $r3 ? $r3->fetch_assoc()['c'] : 0;
 
+$r4 = $conn->query("SELECT COUNT(*) AS c FROM booking WHERE Booking_Status = 'Released'");
+$statReleased = $r4 ? $r4->fetch_assoc()['c'] : 0;
+
 $conn->close();
 ?>
 <!DOCTYPE html>
@@ -130,6 +135,8 @@ $conn->close();
         .stat-pill.amber .s-val { color: #f59e0b; }
         .stat-pill.green { background: rgba(34,197,94,0.08); border-color: rgba(34,197,94,0.3); }
         .stat-pill.green .s-val { color: #22c55e; }
+        .stat-pill.blue { background: rgba(8,66,152,0.08); border-color: rgba(8,66,152,0.3); }
+        .stat-pill.blue .s-val { color: #084298; }
 
         .filter-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 18px; }
         .filter-chip { padding: 6px 16px; border-radius: 20px; border: 1px solid rgba(124,92,252,0.25); background: none; color: #8b82b5; font-size: 0.78rem; cursor: pointer; text-decoration: none; transition: all 0.2s; font-family: inherit; }
@@ -142,6 +149,7 @@ $conn->close();
         .vs-notsent   { background: #e2e3e5; color: #6c757d; }
         .vs-pending   { background: #fff3cd; color: #856404; }
         .vs-confirmed { background: #d4edda; color: #155724; }
+        .vs-released  { background: #cfe2ff; color: #084298; }
 
         .verify-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 6px 16px; font-size: 0.82rem; margin-bottom: 14px; }
         .verify-grid label { font-size: 0.68rem; color: #888; text-transform: uppercase; display: block; margin-bottom: 1px; }
@@ -157,6 +165,7 @@ $conn->close();
         .action-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
         .overdue-flag { font-size: 0.75rem; color: #dc3545; font-weight: bold; }
         .verify-blocked-note { font-size: 0.75rem; color: #856404; font-weight: 600; }
+        .awaiting-collection-note { font-size: 0.82rem; color: #084298; font-weight: 600; }
 
         .msg-banner { padding: 10px 16px; border-radius: 12px; font-size: 0.88rem; font-weight: 600; margin-bottom: 18px; }
         .msg-success { background: rgba(25,135,84,0.12); color: #198754; border: 1px solid rgba(25,135,84,0.3); }
@@ -212,7 +221,7 @@ $conn->close();
             <?php
                 $msgs = [
                     'sent'     => ' Verification request sent to student.',
-                    'released' => ' Items marked as collected successfully.',
+                    'released' => ' Items released. Waiting for the student to confirm collection before the booking is fully closed.',
                     'outside_hours' => 'This action is only available during working hours (8:00 AM - 11:00 AM).',
                     'no_photo' => 'The drop-off photo must be uploaded and confirmed by the student before sending verification. Go to "View Booking" to upload it first.',
                 ];
@@ -235,6 +244,10 @@ $conn->close();
                 <div class="s-val"><?php echo $statConfirmed; ?></div>
                 <div class="s-label">Student Confirmed</div>
             </div>
+            <div class="stat-pill blue">
+                <div class="s-val"><?php echo $statReleased; ?></div>
+                <div class="s-label">Awaiting Collection Confirm</div>
+            </div>
         </div>
 
         <!-- Filters -->
@@ -243,6 +256,7 @@ $conn->close();
             <a href="staffVerifyPanel.php?filter=notsent"   class="filter-chip <?php echo $filter==='notsent'   ? 'active' : ''; ?>">Not Sent</a>
             <a href="staffVerifyPanel.php?filter=pending"   class="filter-chip <?php echo $filter==='pending'   ? 'active' : ''; ?>">Awaiting Student</a>
             <a href="staffVerifyPanel.php?filter=confirmed" class="filter-chip <?php echo $filter==='confirmed' ? 'active' : ''; ?>">Student Confirmed</a>
+            <a href="staffVerifyPanel.php?filter=released"  class="filter-chip <?php echo $filter==='released'  ? 'active' : ''; ?>">Awaiting Collection Confirm</a>
         </div>
 
         <div class="section-label">Bookings</div>
@@ -257,7 +271,9 @@ $conn->close();
         <div class="verify-card">
             <div class="verify-top">
                 <span class="order-id">Booking #<?php echo $row['Booking_ID']; ?></span>
-                <?php if ($bs === 'Confirmed'): ?>
+                <?php if ($bs === 'Released'): ?>
+                    <span class="vs-badge vs-released"> Released — Awaiting Collection Confirm</span>
+                <?php elseif ($bs === 'Confirmed'): ?>
                     <span class="vs-badge vs-confirmed"> Student Confirmed</span>
                 <?php elseif ($bs === 'Verification_Sent'): ?>
                     <span class="vs-badge vs-pending"> Awaiting Student</span>
@@ -280,11 +296,13 @@ $conn->close();
             </div>
 
             <div class="action-row">
-                <?php if ($bs === 'Confirmed'): ?>
+                <?php if ($bs === 'Released'): ?>
+                    <span class="awaiting-collection-note"> Items released — waiting for student to confirm collection.</span>
+                <?php elseif ($bs === 'Confirmed'): ?>
                     <form method="POST" style="display:inline">
                         <input type="hidden" name="release_id" value="<?php echo $row['Booking_ID']; ?>">
                         <button type="submit" class="btn-release"
-                            onclick="return confirm('Mark Booking #<?php echo $row['Booking_ID']; ?> as collected?')">
+                            onclick="return confirm('Release items for Booking #<?php echo $row['Booking_ID']; ?>? The student will need to confirm collection afterward.')">
                              Release Items
                         </button>
                     </form>
