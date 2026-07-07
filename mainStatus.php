@@ -1,364 +1,341 @@
 <?php
 session_start();
 
-// ── Auth guard ───────────────────────────────────────────────────────────────
-if (!isset($_SESSION['Student_ID'])) {
-    header("Location: studentMAIN.html");
+if (!isset($_SESSION['Staff_ID']) || $_SESSION['role'] !== 'staff') {
+    header("Location: login.php");
     exit();
 }
 
 $conn = new mysqli("localhost", "root", "", "utem_accommodation");
-if ($conn->connect_error) {
-    die("Connection Failed: " . $conn->connect_error);
-}
+if ($conn->connect_error) die("Connection Failed: " . $conn->connect_error);
+$conn->query("SET time_zone = '+08:00'"); // keep MySQL NOW()/CURDATE() aligned with Malaysia time
 
-require_once 'autoCancelExpired.php';
-autoCancelExpiredBookings($conn);
+$staff_name = $_SESSION['Staff_Name'] ?? 'Staff';
 
-// ── Ensure Student_Mail is in session ──────────────────────────────────────
-if (!isset($_SESSION['Student_Mail']) || empty($_SESSION['Student_Mail'])) {
-    $student_id = $_SESSION['Student_ID'];
-    $emailQuery = "SELECT Student_Mail FROM student WHERE Student_ID = ?";
-    $emailStmt = $conn->prepare($emailQuery);
-    $emailStmt->bind_param("s", $student_id);
-    $emailStmt->execute();
-    $emailResult = $emailStmt->get_result();
-    
-    if ($emailRow = $emailResult->fetch_assoc()) {
-        $_SESSION['Student_Mail'] = $emailRow['Student_Mail'];
-    }
-    $emailStmt->close();
-}
+// ── Handle inline approve / reject ───────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
-
-
-// ── Handle Booking Cancellation (Permanent Removal) ──────────────────────────
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['cancel_booking_id'])) {
-    $cancelID = intval($_POST['cancel_booking_id']);
-    $student_id = $_SESSION['Student_ID'];
-
-    // Allows removal of both entirely unpaid or "Pay Later" records
-    $verifySql = "SELECT b.Booking_ID FROM booking b 
-                  LEFT JOIN payment p ON b.Booking_ID = p.Booking_ID
-                  WHERE b.Booking_ID = ? 
-                    AND b.Student_ID = ? 
-                    AND LOWER(b.Booking_Status) = 'pending' 
-                    AND (p.Payment_Status IS NULL OR UPPER(p.Payment_Status) != 'Y')";
-                    
-    $verifyStmt = $conn->prepare($verifySql);
-    $verifyStmt->bind_param("is", $cancelID, $student_id);
-    $verifyStmt->execute();
-    $verifyResult = $verifyStmt->get_result();
-
-    if ($verifyResult->num_rows > 0) {
-
-        $getItems = $conn->prepare("SELECT SUM(Quantity) AS total, Space_ID FROM item WHERE Booking_ID = ? GROUP BY Space_ID");
-        $getItems->bind_param("i", $cancelID);
-        $getItems->execute();
-        $itemsResult = $getItems->get_result();
-        while ($itemsRow = $itemsResult->fetch_assoc()) {
-            $cancelledQty = (int)$itemsRow['total'];
-            $spaceID      = (int)$itemsRow['Space_ID'];
-
-            // Restore units back to storespace
-            $restoreSpace = $conn->prepare("UPDATE storespace SET Size = Size + ? WHERE Space_ID = ?");
-            $restoreSpace->bind_param("ii", $cancelledQty, $spaceID);
-            $restoreSpace->execute();
-            $restoreSpace->close();
+    if (isset($_POST['approve_id'])) {
+        $bid = intval($_POST['approve_id']);
+        $conn->query("UPDATE booking SET Booking_Status = 'Approved' WHERE Booking_ID = $bid AND LOWER(Booking_Status) = 'pending'");
+        $feeRes   = $conn->query("SELECT COALESCE(SUM(Quantity * Price), 0) AS tf FROM item WHERE Booking_ID = $bid");
+        $totalFee = (float)$feeRes->fetch_assoc()['tf'];
+        $conn->query("INSERT INTO payment (Payment_Method, Payment_Status, Payment_Date, Amount, Booking_ID)
+                      VALUES ('Online', 'N', CURDATE(), $totalFee, $bid)
+                      ON DUPLICATE KEY UPDATE Payment_Status='N', Amount=$totalFee");
+        $spRes = $conn->query("SELECT SUM(Quantity) AS tot, Space_ID FROM item WHERE Booking_ID = $bid GROUP BY Space_ID");
+        while ($sr = $spRes->fetch_assoc()) {
+            $conn->query("UPDATE storespace SET Size = Size - {$sr['tot']} WHERE Space_ID = {$sr['Space_ID']}");
         }
-        $getItems->close();
-
-        // Delete records inside 'payment' linked to this booking
-        $deletePay = $conn->prepare("DELETE FROM payment WHERE Booking_ID = ?");
-        $deletePay->bind_param("i", $cancelID);
-        $deletePay->execute();
-        $deletePay->close();
-
-        // Delete records inside 'item' linked to this booking
-        $deleteItems = $conn->prepare("DELETE FROM item WHERE Booking_ID = ?");
-        $deleteItems->bind_param("i", $cancelID);
-        $deleteItems->execute();
-        $deleteItems->close();
-
-        // Safely delete the parent row from 'booking'
-        $deleteBooking = $conn->prepare("DELETE FROM booking WHERE Booking_ID = ?");
-        $deleteBooking->bind_param("i", $cancelID);
-        $deleteBooking->execute();
-        $deleteBooking->close();
-        
-        header("Location: mainStatus.php" . (isset($_GET['sort']) ? "?sort=" . $_GET['sort'] : ""));
-        exit();
+        header("Location: staffMainStatus.php?tab=pending&msg=approved&bid=$bid"); exit();
     }
-    $verifyStmt->close();
+
+    if (isset($_POST['reject_id'])) {
+        $bid    = intval($_POST['reject_id']);
+        $reason = trim($_POST['reject_reason'] ?? '');
+        if (!$reason) {
+            header("Location: staffMainStatus.php?tab=pending&msg=no_reason"); exit();
+        }
+        $proofPath = '';
+        if (isset($_FILES['reject_photo']) && $_FILES['reject_photo']['error'] === 0) {
+            $ext     = strtolower(pathinfo($_FILES['reject_photo']['name'], PATHINFO_EXTENSION));
+            $allowed = ['jpg','jpeg','png','gif','webp'];
+            if (in_array($ext, $allowed)) {
+                $dir = 'uploads/rejection/';
+                if (!is_dir($dir)) mkdir($dir, 0755, true);
+                $fname = 'reject_' . $bid . '_' . time() . '.' . $ext;
+                if (move_uploaded_file($_FILES['reject_photo']['tmp_name'], $dir . $fname)) {
+                    $proofPath = $dir . $fname;
+                }
+            }
+        }
+        $rEsc = $conn->real_escape_string($reason);
+        $pEsc = $conn->real_escape_string($proofPath);
+        $rejectResult = $conn->query("UPDATE booking SET Booking_Status='Rejected', Rejection_Reason='$rEsc', Rejection_Photo='$pEsc'
+                      WHERE Booking_ID=$bid AND LOWER(Booking_Status)='pending'");
+        if (!$rejectResult) {
+            die("Reject UPDATE failed: " . $conn->error);
+        }
+        if ($conn->affected_rows === 0) {
+            die("Reject UPDATE ran but changed 0 rows. Booking_ID=$bid may not exist, or its Booking_Status is not 'pending'.");
+        }
+        header("Location: staffMainStatus.php?tab=pending&msg=rejected&bid=$bid"); exit();
+    }
 }
 
-// ── Handle Drop-off Photo Confirmation (student verifies staff's uploaded photo) ──
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['dropoff_confirm_id'])) {
-    $confirmID = intval($_POST['dropoff_confirm_id']);
-    $decision  = ($_POST['dropoff_decision'] ?? '') === 'yes' ? 'Confirmed' : 'Rejected';
-    $student_id = $_SESSION['Student_ID'];
+// ── Counts ────────────────────────────────────────────────────────────────────
+$pending         = $conn->query("SELECT COUNT(*) AS c FROM booking WHERE LOWER(Booking_Status)='pending'")->fetch_assoc()['c'];
+$approved        = $conn->query("SELECT COUNT(*) AS c FROM booking WHERE LOWER(Booking_Status)='approved'")->fetch_assoc()['c'];
+$total           = $conn->query("SELECT COUNT(*) AS c FROM booking")->fetch_assoc()['c'];
+$collected       = $conn->query("SELECT COUNT(*) AS c FROM booking WHERE LOWER(Booking_Status)='collected'")->fetch_assoc()['c'];
+$pendingStudents = $conn->query("SELECT COUNT(DISTINCT Student_ID) AS c FROM booking WHERE LOWER(Booking_Status)='pending'")->fetch_assoc()['c'];
 
-    $stmt = $conn->prepare("UPDATE booking SET Dropoff_Status = ? WHERE Booking_ID = ? AND Student_ID = ? AND Dropoff_Status = 'Pending'");
-    $stmt->bind_param("sis", $decision, $confirmID, $student_id);
-    $stmt->execute();
-    $stmt->close();
-
-    header("Location: mainStatus.php" . (isset($_GET['sort']) ? "?sort=" . $_GET['sort'] : ""));
-    exit();
+// ── Notification badge count: everything needing staff action today ──────────
+function safeCount(mysqli $conn, string $sql): int {
+    $res = $conn->query($sql);
+    if (!$res) return 0; // never let a failed query take down the whole dashboard
+    $row = $res->fetch_assoc();
+    return (int)($row['c'] ?? 0);
 }
 
-// ── Student ID (needed for all queries below) ─────────────────────────────────
-$student_id   = $_SESSION['Student_ID'];
-$studentIdEsc = $conn->real_escape_string($student_id);
-
-// ── Notification count: things needing the student's attention ───────────────
-$notifCountRes = $conn->query("
-    SELECT COUNT(*) AS c FROM booking
-    WHERE Student_ID = '$studentIdEsc'
-      AND (
-            LOWER(Booking_Status) = 'verification_sent'
-            OR Dropoff_Status = 'Pending'
+$needUploadCount = safeCount($conn, "
+    SELECT COUNT(*) AS c
+    FROM booking b
+    WHERE LOWER(b.Booking_Status) = 'approved'
+      AND b.DropOff_Date = CURDATE()
+      AND (b.Dropoff_Photo IS NULL OR b.Dropoff_Photo = '')
+      AND EXISTS (
+            SELECT 1 FROM payment p
+            WHERE p.Booking_ID = b.Booking_ID AND UPPER(p.Payment_Status) = 'Y'
           )
 ");
-$notifCount = $notifCountRes ? (int)$notifCountRes->fetch_assoc()['c'] : 0;
 
-// ── Check if student has an active booking ────────────────────────────────────
-// Active = any booking not yet fully closed out (not rejected, collected, cancelled, waived, or settled)
-// A booking stays "active" even after its pickup date passes, until the student actually collects their items.
-$activeCheck = $conn->query("
+$needSendCount = safeCount($conn, "SELECT COUNT(*) AS c FROM booking WHERE Dropoff_Status = 'Uploaded'");
+
+$needReuploadCount = safeCount($conn, "SELECT COUNT(*) AS c FROM booking WHERE Dropoff_Status = 'Rejected'");
+
+$needVerifyCount = safeCount($conn, "
     SELECT COUNT(*) AS c FROM booking
-    WHERE Student_ID = '$studentIdEsc'
-      AND LOWER(Booking_Status) NOT IN ('rejected', 'collected', 'cancelled_unpaid', 'cancelled', 'waived', 'settled')
+    WHERE LOWER(Booking_Status) = 'approved' AND Dropoff_Status = 'Confirmed' AND Pickup_Date = CURDATE()
 ");
-$hasActiveBooking = ($activeCheck && $activeCheck->fetch_assoc()['c'] > 0);
 
-// ── Check if a booking window is currently open ───────────────────────────────
-$windowCheck = $conn->query("
-    SELECT COUNT(*) AS c FROM booking_window
-    WHERE start_date <= CURDATE() AND end_date >= CURDATE()
+$overdueCount = safeCount($conn, "
+    SELECT COUNT(*) AS c FROM booking
+    WHERE LOWER(Booking_Status) = 'approved' AND DATE_ADD(Pickup_Date, INTERVAL 11 HOUR) < NOW()
 ");
-$bookingOpen = ($windowCheck && $windowCheck->fetch_assoc()['c'] > 0);
 
-// ── Sort order ───────────────────────────────────────────────────────────────
-$order = (isset($_GET['sort']) && $_GET['sort'] === 'old') ? 'ASC' : 'DESC';
+$notifTotal = $needUploadCount + $needSendCount + $needReuploadCount
+            + $needVerifyCount + $overdueCount + (int)$pending;
 
-// ── Fetch bookings for the logged-in student only ────────────────────────────
+// ── Tab queries ───────────────────────────────────────────────────────────────
+function bookingQuery(mysqli $conn, array $statuses, string $order = "b.Booking_ID DESC"): mysqli_result|false {
+    $in = "'" . implode("','", $statuses) . "'";
+    return $conn->query("
+        SELECT b.Booking_ID, b.Booking_Status, b.DropOff_Date, b.Pickup_Date,
+               b.Booking_Priority, b.Booking_Date,
+               s.Student_Name, s.Student_ID, rc.Residential_Block,
+               (SELECT COALESCE(SUM(i.Quantity), 0) FROM item i WHERE i.Booking_ID = b.Booking_ID)           AS TotalItem,
+               (SELECT COALESCE(SUM(i.Quantity * i.Price), 0) FROM item i WHERE i.Booking_ID = b.Booking_ID) AS TotalFee,
+               (SELECT Payment_Status FROM payment WHERE Booking_ID = b.Booking_ID LIMIT 1) AS Payment_Status,
+               (SELECT Amount FROM payment WHERE Booking_ID = b.Booking_ID LIMIT 1) AS PaymentAmount
+        FROM booking b
+        LEFT JOIN student s ON b.Student_ID = s.Student_ID
+        LEFT JOIN residential_college rc ON s.Residential_ID = rc.Residential_ID
+        WHERE LOWER(b.Booking_Status) IN ($in)
+        ORDER BY (b.Booking_Priority='Y') DESC, $order
+    ");
+}
 
-$sql = "
-    SELECT
-        b.Booking_ID,
-        b.DropOff_Date,
-        b.Pickup_Date,
-        b.Booking_Status,
-        b.Booking_Priority,
-        b.Rejection_Reason,
-        b.Rejection_Photo,
-        b.Dropoff_Photo,
-        b.Dropoff_Status,
-        s.Student_Name,
-        rc.Residential_Block,
-        IFNULL((SELECT SUM(Quantity) FROM item WHERE Booking_ID = b.Booking_ID), 0) AS TotalItem,
-        IFNULL((SELECT SUM(Quantity * Price) FROM item WHERE Booking_ID = b.Booking_ID), 0) AS TotalFee
-    FROM booking b
-    LEFT JOIN student s              ON b.Student_ID     = s.Student_ID
-    LEFT JOIN item i                 ON b.Booking_ID     = i.Booking_ID
-    LEFT JOIN storespace ss          ON i.Space_ID       = ss.Space_ID
-    LEFT JOIN residential_college rc ON ss.Residential_ID = rc.Residential_ID
-    WHERE b.Student_ID = '$studentIdEsc'
-    GROUP BY
-        b.Booking_ID, b.DropOff_Date, b.Pickup_Date,
-        b.Booking_Status, b.Booking_Priority, b.Rejection_Reason, b.Rejection_Photo,
-        b.Dropoff_Photo, b.Dropoff_Status,
-        s.Student_Name, rc.Residential_Block
-    ORDER BY b.Booking_ID $order
-";
+// Pending — oldest first so longest waiting gets reviewed first
+$pendingQ   = bookingQuery($conn, ['pending'], 'b.Booking_ID ASC');
+// Approved — newest first
+$approvedQ  = bookingQuery($conn, ['approved','verification_sent','confirmed'], 'b.Booking_ID DESC');
+// Cancelled/rejected — oldest first (first out, stack at bottom)
+$cancelledQ = bookingQuery($conn, ['rejected','cancelled','cancelled_unpaid','waived','settled'], 'b.Booking_ID ASC');
+// Collected — newest first
+$collectedQ = bookingQuery($conn, ['collected'], 'b.Booking_ID DESC');
 
-$result = $conn->query($sql);
+$conn->close();
+
+$activeTab = $_GET['tab'] ?? 'pending';
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VaulteM - Home</title>
-    <link rel="icon" type="image/x-icon" href="vaultemLogo.ico">
+    <title>VaulteM – Staff Home</title>
     <link rel="stylesheet" href="status.css">
     <link rel="stylesheet" href="mobile.css">
     <style>
-        .status-card {
-            position: relative;
-        }
-
-        .pay-btn {
-            background-color: #4CAF50; color: white; border: none; border-radius: 15px;
-            padding: 8px 20px; font-weight: bold; cursor: pointer;
-            transition: all 0.3s ease; font-size: 0.9rem; margin-left: 10px;
-        }
-        .pay-btn:hover { background-color: #45a049; transform: scale(1.05); }
-        .pay-btn:active { transform: scale(0.95); }
-        .pay-btn.paid { background-color: #808080; cursor: not-allowed; opacity: 0.6; }
-        .pay-btn.paid:hover { transform: none; }
-        
-        .status-text { display: inline-block; padding: 4px 12px; border-radius: 12px; font-weight: bold; font-size: 0.85rem; }
-        .status-pending  { background-color: #fff3cd; color: #856404; }
-        .status-approved { background-color: #d4edda; color: #155724; }
-        .status-rejected { background-color: #f8d7da; color: #721c24; }
-        .status-cancelled { background-color: #e2e3e5; color: #495057; }
-        .header-main    { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; padding-right: 25px; } 
-        .header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-        .priority-badge {
-            background-color: #dc3545; color: white; font-size: 0.75rem;
-            padding: 2px 8px; border-radius: 10px; font-weight: bold;
-        }
-        
-        #profileContainer {
-            position: relative;
-            display: inline-block;
-            cursor: pointer;
-        }
-        #userImage {
-            vertical-align: middle;
-            margin-left: 5px;
-        }
-        #profileSelect {
-            display: none;
-            position: absolute;
-            right: 0;
-            top: 25px;
-            background-color: #241253;
-            border: 1px solid #E8E9DE;
-            border-radius: 8px;
-            min-width: 130px;
-            z-index: 10;
-        }
-        #profileSelect.show {
+        /* ── Tabs ── */
+        .tab-bar {
             display: flex;
-            flex-direction: column;
+            gap: 2px;
+            border-bottom: 1px solid rgba(124,92,252,0.2);
+            margin-bottom: 22px;
+            flex-wrap: wrap;
         }
-        #profileSelect button {
+        .tab-btn {
             background: none;
             border: none;
-            color: #E8E9DE;
-            padding: 10px;
-            text-align: left;
-            width: 100%;
-            cursor: pointer;
-            font-size: 0.85rem;
-        }
-        #profileSelect button:hover {
-            background-color: rgba(232, 233, 222, 0.2);
-        }
-
-        @media (max-width: 768px) {
-            .header-main    { flex-direction: column; align-items: flex-start; }
-            .header-actions { width: 100%; justify-content: space-between; }
-            .pay-btn        { margin-left: 0; }
-        }
-
-        .pickup-note {
-            margin-top: 5px;
-            font-size: 0.85rem;
-            color: #dc3545;
-            font-weight: bold;
-        }
-
-        .small-cancel-btn {
-            background-color: #dc3545;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            padding: 6px 14px;
-            font-size: 0.8rem;
+            border-bottom: 3px solid transparent;
+            color: #8b82b5;
+            padding: 10px 16px;
+            font-size: 0.82rem;
             font-weight: 600;
             cursor: pointer;
-            transition: background-color 0.2s ease, transform 0.2s ease;
-            margin-top: 8px;
+            font-family: inherit;
+            text-decoration: none;
+            transition: all 0.2s;
+            margin-bottom: -1px;
+            white-space: nowrap;
+        }
+        .tab-btn:hover { color: #b084ff; }
+        .tab-btn.active { color: #b084ff; border-bottom-color: #7c5cfc; }
+        .tab-badge {
             display: inline-block;
+            font-size: 0.62rem;
+            font-weight: 800;
+            padding: 1px 7px;
+            border-radius: 10px;
+            margin-left: 4px;
+            vertical-align: middle;
         }
-        .small-cancel-btn:hover { background-color: #bd2130; }
-        .small-cancel-btn:active { transform: scale(0.95); }
+        .badge-pending   { background:#fff3cd; border:1px solid #856404; color:#856404; }
+        .badge-approved  { background:#d4edda; border:1px solid #155724; color:#155724; }
+        .badge-cancelled { background:#f8d7da; border:1px solid #721c24; color:#721c24; }
+        .badge-collected { background:#e2e3e5; border:1px solid #495057; color:#495057; }
 
-        .first-booking-link {
-            color: #209708;
-            font-weight: bold;
-            text-decoration: underline;
-        }
-        .first-booking-link:hover {
-            color: #209708;
-        }
+        /* ── Stats ── */
+        .stats-row { display:flex; gap:14px; margin-bottom:20px; flex-wrap:wrap; }
+        .stat-pill { flex:1; min-width:90px; background:rgba(124,92,252,0.10); border:1px solid rgba(124,92,252,0.25); border-radius:14px; padding:14px 16px; text-align:center; }
+        .stat-pill .s-val   { font-size:1.7rem; font-weight:800; color:#b084ff; line-height:1; }
+        .stat-pill .s-label { font-size:0.68rem; color:#8b82b5; text-transform:uppercase; letter-spacing:0.5px; margin-top:4px; }
+        .stat-pill.amber { background-color:white; border-color:rgba(245,158,11,0.35); }
+        .stat-pill.amber .s-val { color:#f59e0b; }
+        .stat-pill.green  { background-color:white; border-color:rgba(34,197,94,0.3); }
+        .stat-pill.green .s-val  { color:#22c55e; }
+        .stat-pill.grey   { background-color:white; border-color:rgba(73,80,87,0.25); }
+        .stat-pill.grey .s-val   { color:#495057; }
 
-        /* ── Review / Rejection notes ── */
-        .review-note {
-            margin-top: 10px;
-            background: #fff3cd;
-            color: #856404;
-            border: 1px solid rgba(133,100,4,0.25);
-            border-radius: 10px;
-            padding: 10px 14px;
-            font-size: 0.85rem;
+        /* ── Action banner ── */
+        .action-banner {
+            background:#fff3cd; border:1px solid rgba(133,100,4,0.25);
+            border-left:4px solid #856404; border-radius:14px;
+            padding:14px 18px; margin-bottom:20px; color:#856404;
+            font-size:0.88rem; display:flex; align-items:center;
+            justify-content:space-between; flex-wrap:wrap; gap:10px;
         }
-        .rejection-note {
-            margin-top: 10px;
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid rgba(114,28,36,0.25);
-            border-radius: 10px;
-            padding: 10px 14px;
-            font-size: 0.85rem;
+        .action-banner strong { color:#856404; }
+        .review-btn {
+            background:#856404; color:#fff3cd; border:none;
+            padding:8px 18px; border-radius:20px; font-size:0.82rem;
+            font-weight:700; cursor:pointer; font-family:inherit;
+            text-decoration:none; white-space:nowrap;
         }
-        .cancelled-note {
-            margin-top: 10px;
-            background: #e2e3e5;
-            color: #495057;
-            border: 1px solid rgba(73,80,87,0.25);
-            border-radius: 10px;
-            padding: 10px 14px;
-            font-size: 0.85rem;
-        }
+        .review-btn:hover { background:#6b5003; }
 
-        /* ── Drop-off photo confirmation ── */
-        .dropoff-confirm-box {
-            margin-top: 10px;
-            background: #fff3cd;
-            border: 1px solid rgba(133,100,4,0.25);
-            border-radius: 10px;
-            padding: 12px 14px;
+        /* ── Queue table (pending tab) ── */
+        .queue-wrap { overflow-x:auto; margin-bottom:20px; }
+        .queue-table {
+            width:100%; border-collapse:collapse; font-size:0.82rem;
+            background:#f1f0ea; border-radius:16px; overflow:hidden;
         }
-        .dropoff-confirm-box p {
-            margin: 0 0 8px;
-            font-weight: 600;
-            color: #856404;
-            font-size: 0.85rem;
+        .queue-table th {
+            background:#e8e7df; color:#555; font-size:0.7rem;
+            text-transform:uppercase; letter-spacing:0.4px;
+            padding:11px 14px; text-align:left; white-space:nowrap;
         }
-        .dropoff-confirm-box img {
-            max-width: 220px;
-            border-radius: 10px;
+        .queue-table td {
+            padding:11px 14px; border-bottom:1px solid #dddcd6;
+            color:#1e1b4b; vertical-align:middle;
+        }
+        .queue-table tr:last-child td { border-bottom:none; }
+        .queue-table tr:hover td { background:rgba(124,92,252,0.04); }
+        .wait-days { font-size:0.72rem; color:#888; display:block; margin-top:2px; }
+
+        .btn-approve-sm {
+            background:#198754; color:#fff; border:none;
+            padding:6px 14px; border-radius:12px; font-size:0.75rem;
+            font-weight:700; cursor:pointer; font-family:inherit;
+            white-space:nowrap; margin-right:4px;
+        }
+        .btn-approve-sm:hover { background:#157347; }
+        .btn-reject-sm {
+            background:#f8d7da; color:#721c24; border:1px solid #f5c2c7;
+            padding:6px 14px; border-radius:12px; font-size:0.75rem;
+            font-weight:700; cursor:pointer; font-family:inherit; white-space:nowrap;
+        }
+        .btn-reject-sm:hover { background:#f1aeb5; }
+        .view-link { color:#7c5cfc; font-size:0.72rem; text-decoration:none; display:block; margin-top:4px; }
+        .view-link:hover { text-decoration:underline; }
+
+        /* ── Status cards ── */
+        .status-card { position:relative; }
+        .status-text { display:inline-block; padding:4px 12px; border-radius:12px; font-weight:bold; font-size:0.85rem; }
+        .status-pending           { background:#fff3cd; color:#856404; }
+        .status-approved          { background:#d4edda; color:#155724; }
+        .status-rejected          { background:#f8d7da; color:#721c24; }
+        .status-verification_sent { background:#cfe2ff; color:#084298; }
+        .status-confirmed         { background:#d4edda; color:#155724; }
+        .status-collected         { background:#e2e3e5; color:#495057; }
+        .status-other             { background:#e2e3e5; color:#495057; }
+        .priority-badge { background:#dc3545; color:white; font-size:0.75rem; padding:2px 8px; border-radius:10px; font-weight:bold; }
+        .prio-badge     { background:#dc3545; color:#fff; font-size:0.65rem; padding:2px 6px; border-radius:8px; font-weight:700; }
+        .header-main    { display:flex; align-items:center; flex-wrap:wrap; gap:10px; }
+        .view-booking-btn { background:#241253; color:#E8E9DE; border:none; padding:7px 16px; border-radius:14px; cursor:pointer; font-size:0.8rem; font-weight:bold; text-decoration:none; display:inline-block; }
+        .view-booking-btn:hover { background:#37216d; transform:translateY(-1px); }
+
+        /* Collected cards — muted */
+        .status-card.muted-card { opacity:0.6; }
+        .status-card.muted-card:hover { opacity:0.85; }
+
+        /* Empty state */
+        .empty-state { background:#f1f0ea; color:#8b82b5; border-radius:16px; padding:36px; text-align:center; font-size:0.9rem; }
+
+        /* Side nav (moved from quick-actions into leftcontainer) — plain list style, not buttons */
+        .side-nav {
+            display: flex;
+            flex-direction: column;
+            width: 80%;
+            max-width: 320px;
+            margin: 22px auto;
+            text-align: center;
+        }
+        .side-nav a {
             display: block;
-            margin-bottom: 10px;
+            color: #241253;
+            text-decoration: none;
+            padding: 22px 4px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border-bottom: 1px solid rgba(36,18,83,0.08);
+            transition: all 0.2s;
         }
-        .confirm-yes-btn {
-            background-color: #4CAF50; color: white; border: none; border-radius: 15px;
-            padding: 8px 20px; font-weight: bold; cursor: pointer; font-size: 0.85rem;
+        .side-nav a:last-child { border-bottom: none; }
+        .side-nav a:hover {
+            color: #7c5cfc;
+            background: rgba(124,92,252,0.06);
         }
-        .confirm-yes-btn:hover { background-color: #45a049; }
-        .confirm-no-btn {
-            background-color: #dc3545; color: white; border: none; border-radius: 15px;
-            padding: 8px 20px; font-weight: bold; cursor: pointer; font-size: 0.85rem;
-            margin-left: 8px;
-        }
-        .confirm-no-btn:hover { background-color: #bd2130; }
 
-        /* ── Notification badge (WhatsApp-style unread indicator) ── */
+        .section-label { font-size:0.8rem; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:#8b82b5; margin-bottom:10px; }
+
+        /* Reject modal */
+        .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:200; justify-content:center; align-items:center; }
+        .modal-overlay.show { display:flex; }
+        .modal-box { background:#f1f0ea; color:#1e1b4b; border-radius:20px; padding:28px; width:90%; max-width:420px; }
+        .modal-box h3 { margin:0 0 10px; font-size:1rem; }
+        .modal-box p  { font-size:0.8rem; color:#555; margin:0 0 12px; }
+        .modal-box textarea { width:100%; border-radius:10px; border:1px solid #ccc; padding:10px; font-size:0.88rem; resize:vertical; min-height:80px; font-family:inherit; margin-bottom:12px; box-sizing:border-box; }
+        .modal-btns { display:flex; gap:8px; justify-content:flex-end; margin-top:4px; }
+        .btn-cancel-modal { background:none; border:1px solid #ccc; color:#666; padding:8px 16px; border-radius:16px; cursor:pointer; font-family:inherit; }
+        .btn-confirm-reject { background:#dc3545; color:#fff; border:none; padding:8px 18px; border-radius:16px; font-weight:bold; cursor:pointer; font-family:inherit; }
+
+        /* Msg banner */
+        .msg-banner { padding:10px 16px; border-radius:12px; font-size:0.85rem; font-weight:600; margin-bottom:16px; }
+        .msg-success { background:rgba(34,197,94,0.12); color:#22c55e; border:1px solid rgba(34,197,94,0.3); }
+        .msg-info    { background:#fff3cd; color:#856404; border:1px solid rgba(133,100,4,0.25); }
+        .msg-error   { background:rgba(239,68,68,0.1); color:#f87171; border:1px solid rgba(239,68,68,0.3); }
+
+        #profileContainer { position:relative; display:inline-block; cursor:pointer; }
+        #userImage { vertical-align:middle; margin-left:5px; }
+        #profileSelect { display:none; position:absolute; right:0; top:25px; background-color:#241253; border:1px solid #E8E9DE; border-radius:8px; min-width:130px; z-index:10; }
+        #profileSelect.show { display:flex; flex-direction:column; }
+        #profileSelect button { background:none; border:none; color:#E8E9DE; padding:10px; text-align:left; width:100%; cursor:pointer; font-size:0.85rem; }
+        #profileSelect button:hover { background-color:rgba(232,233,222,0.2); }
+
+        /* ── Notification badge (deliberately eye-catching — this is meant to be noticed) ── */
         .notif-badge {
             position: absolute;
             top: -4px;
             right: -4px;
-            background: #dc3545;
+            background: #ef4444;
             color: #fff;
-            font-size: 0.62rem;
+            font-size: 0.65rem;
             font-weight: 800;
-            min-width: 15px;
-            height: 15px;
+            min-width: 16px;
+            height: 16px;
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -366,14 +343,19 @@ $result = $conn->query($sql);
             padding: 0 3px;
             line-height: 1;
             box-shadow: 0 0 0 2px #241253;
+            animation: notifPulse 2s ease-in-out infinite;
+        }
+        @keyframes notifPulse {
+            0%, 100% { box-shadow: 0 0 0 2px #241253, 0 0 0 0 rgba(239,68,68,0.6); }
+            50%      { box-shadow: 0 0 0 2px #241253, 0 0 0 4px rgba(239,68,68,0); }
         }
         .notif-badge-inline {
-            background: #dc3545;
+            background: #ef4444;
             color: #fff;
-            font-size: 0.65rem;
+            font-size: 0.68rem;
             font-weight: 800;
             border-radius: 10px;
-            padding: 1px 7px;
+            padding: 2px 8px;
             margin-left: 8px;
         }
         #profileSelect button {
@@ -381,18 +363,14 @@ $result = $conn->query($sql);
             align-items: center;
             justify-content: space-between;
         }
-        .verif-action-note {
-            margin-top: 10px;
-            background: #cfe2ff;
-            color: #084298;
-            border: 1px solid rgba(8,66,152,0.3);
-            border-radius: 10px;
-            padding: 10px 14px;
-            font-size: 0.85rem;
-            font-weight: 600;
+
+        @media (max-width: 768px) {
+            .stats-row { flex-direction:column; }
+            .header-main { flex-direction:column; align-items:flex-start; }
+            .side-nav {
+                max-width: 100%;
+            }
         }
-        .status-verification_sent { background-color: #cfe2ff; color: #084298; }
-        
     </style>
 </head>
 <body>
@@ -400,280 +378,312 @@ $result = $conn->query($sql);
 
     <div class="leftcontainer">
         <header>
-            <h1 onclick="window.location.href='mainStatus.php'" style="cursor:pointer;">VaulteM</h1>
+            <h1 onclick="window.location.href='staffMainStatus.php'" style="cursor:pointer;">VaulteM</h1>
         </header>
-        <button type="button" id="booking"
-            <?php if ($hasActiveBooking): ?>
-                disabled
-                title="You already have a booking in progress. You can book again once your items are collected."
-                style="opacity:0.45; cursor:not-allowed; transform:none;"
-            <?php elseif (!$bookingOpen): ?>
-                disabled
-                title="Booking is currently closed. Please check back during the next scheduled booking period."
-                style="opacity:0.45; cursor:not-allowed; transform:none;"
-            <?php else: ?>
-                onclick="window.location.href='form.php'"
-            <?php endif; ?>>
-            Book space
+
+        <!-- Navigation (moved here from the old horizontal quick-actions row) -->
+        <nav class="side-nav">
+            <a href="staffbookingrecords.php">Bookings</a>
+            <a href="Staffverifypanel.php">Verification</a>
+            <a href="staffStudentList.php">Students</a>
+            <a href="staffpenalty.php">Penalty</a>
+            <a href="staffreport.php">Reports</a>
+        </nav>
+
+        <button type="button" id="booking" onclick="window.location.href='staffBookingWindow.php'">
+            Manage Booking Form
         </button>
-        <?php if ($hasActiveBooking): ?>
-            <p style="font-size:0.72rem; color:rgba(36,18,83,0.6); text-align:center; margin-top:6px; padding: 0 8px;">
-                Available after your items are collected
-            </p>
-        <?php elseif (!$bookingOpen): ?>
-            <p style="font-size:0.72rem; color:rgba(36,18,83,0.6); text-align:center; margin-top:6px; padding: 0 8px;">
-                Booking is currently closed
-            </p>
-        <?php endif; ?>
     </div>
 
     <div class="rightcontainer">
+
         <div id="userName">
             Welcome,
-            <span id="currentName"><?php echo isset($_SESSION['Student_Name']) ? htmlspecialchars($_SESSION['Student_Name']) : 'Guest'; ?></span>
-
+            <span id="currentName"><?php echo htmlspecialchars($staff_name); ?></span>
             <span id="profileContainer">
                 <span style="position:relative; display:inline-block;">
                     <img id="userImage" src="image/user.png" width="20px" height="20px" onclick="profileMenu()">
-                    <?php if ($notifCount > 0): ?>
-                        <span class="notif-badge"><?php echo $notifCount; ?></span>
+                    <?php if ($notifTotal > 0): ?>
+                        <span class="notif-badge"><?php echo $notifTotal; ?></span>
                     <?php endif; ?>
                 </span>
                 <div id="profileSelect">
-                    <button onclick="showProfile();">Profile</button>
-                    <button onclick="window.location.href='settings.php'">Settings</button>
-                    <button onclick="window.location.href='studentverify.php'">
-                        Notification
-                        <?php if ($notifCount > 0): ?>
-                            <span class="notif-badge-inline"><?php echo $notifCount; ?></span>
+                    <button onclick="showProfile()">Profile</button>
+                    <button onclick="window.location.href='staffNotifications.php'">
+                        Notifications
+                        <?php if ($notifTotal > 0): ?>
+                            <span class="notif-badge-inline"><?php echo $notifTotal; ?></span>
                         <?php endif; ?>
                     </button>
-                    <button onclick="showLog();">Logout</button>
+                    <button onclick="showLog()">Logout</button>
                 </div>
             </span>
         </div>
 
-        <h1>Status</h1>
+        <h1>Dashboard</h1>
 
-        <?php if (isset($_GET['msg']) && $_GET['msg'] === 'already_booked'): ?>
-        <div style="background:#fff3cd; color:#856404; border:1px solid rgba(245,158,11,0.4); border-radius:12px; padding:10px 16px; font-size:0.85rem; font-weight:600; margin-bottom:14px;">
-            You already have a booking in progress. You can make a new booking once your items have been collected.
+        <!-- Stats -->
+        <div class="stats-row">
+            <div class="stat-pill amber">
+                <div class="s-val"><?php echo $pending; ?></div>
+                <div class="s-label">Pending</div>
+            </div>
+            <div class="stat-pill green">
+                <div class="s-val"><?php echo $approved; ?></div>
+                <div class="s-label">Approved</div>
+            </div>
+            <div class="stat-pill grey">
+                <div class="s-val"><?php echo $collected; ?></div>
+                <div class="s-label">Collected</div>
+            </div>
+            <div class="stat-pill">
+                <div class="s-val"><?php echo $total; ?></div>
+                <div class="s-label">Total</div>
+            </div>
+        </div>
+
+        <!-- Action banner -->
+        <?php if ($pending > 0): ?>
+        <div class="action-banner">
+            <span>
+                <strong><?php echo $pending; ?> booking<?php echo $pending !== 1 ? 's' : ''; ?></strong>
+                from
+                <strong><?php echo $pendingStudents; ?> student<?php echo $pendingStudents !== 1 ? 's' : ''; ?></strong>
+                <?php echo $pending !== 1 ? 'are' : 'is'; ?> waiting for your approval.
+            </span>
+            <a href="staffMainStatus.php?tab=pending" class="review-btn">Review Now</a>
         </div>
         <?php endif; ?>
 
-        <?php if (isset($_GET['msg']) && $_GET['msg'] === 'booking_submitted'): ?>
-        <div style="background:#cfe2ff; color:#084298; border:1px solid rgba(8,66,152,0.3); border-radius:12px; padding:10px 16px; font-size:0.85rem; font-weight:600; margin-bottom:14px;">
-            Your booking has been submitted and is now awaiting staff review. You'll be able to pay once it's approved.
+        <!-- ── 4 Tabs ── -->
+        <div class="tab-bar">
+            <a href="staffMainStatus.php?tab=pending" class="tab-btn <?php echo $activeTab==='pending' ? 'active' : ''; ?>">
+                Pending
+                <?php if ($pending > 0): ?>
+                <span class="tab-badge badge-pending"><?php echo $pending; ?></span>
+                <?php endif; ?>
+            </a>
+            <a href="staffMainStatus.php?tab=approved" class="tab-btn <?php echo $activeTab==='approved' ? 'active' : ''; ?>">
+                Approved
+                <?php if ($approved > 0): ?>
+                <span class="tab-badge badge-approved"><?php echo $approved; ?></span>
+                <?php endif; ?>
+            </a>
+            <a href="staffMainStatus.php?tab=cancelled" class="tab-btn <?php echo $activeTab==='cancelled' ? 'active' : ''; ?>">
+                Cancelled / Rejected
+            </a>
+            <a href="staffMainStatus.php?tab=collected" class="tab-btn <?php echo $activeTab==='collected' ? 'active' : ''; ?>">
+                Collected
+                <?php if ($collected > 0): ?>
+                <span class="tab-badge badge-collected"><?php echo $collected; ?></span>
+                <?php endif; ?>
+            </a>
+        </div>
+
+        <!-- Msg banner -->
+        <?php if (isset($_GET['msg'])): ?>
+        <div class="msg-banner <?php echo $_GET['msg']==='approved' ? 'msg-success' : ($_GET['msg']==='no_reason' ? 'msg-error' : 'msg-info'); ?>">
+            <?php
+                $bid_ref = isset($_GET['bid']) ? ' (Booking #'.intval($_GET['bid']).')' : '';
+                $msgs = [
+                    'approved'  => 'Booking approved'.$bid_ref.'. Student notified to pay.',
+                    'rejected'  => 'Booking rejected'.$bid_ref.'. Student notified.',
+                    'no_reason' => 'A rejection reason is required before rejecting.',
+                ];
+                echo $msgs[$_GET['msg']] ?? '';
+            ?>
         </div>
         <?php endif; ?>
 
-        <div class="filter-wrapper">
-            <button id="filterBtn" data-order="<?php echo ($order === 'ASC') ? 'old' : 'recent'; ?>">
-                <span id="filterLabel"><?php echo ($order === 'ASC') ? 'Old to Recent' : 'Recent to Old'; ?></span>
-                <span class="arrow">&#9662;</span>
-            </button>
-        </div>
+        <?php
+        // ── Helper to render a standard booking card ──────────────────────────
+        function renderCard(array $row, string $extraClass = ''): void {
+            $bstat  = $row['Booking_Status'];
+            $bsl    = strtolower($bstat);
+            $isPrio = $row['Booking_Priority'] === 'Y';
+            $ps     = strtolower($row['Payment_Status'] ?? '');
+            $isPaid = ($ps === 'y' || $ps === 'paid');
+            $feeToShow = $row['PaymentAmount'] ?? $row['TotalFee'];
 
-        <?php if ($result && $result->num_rows > 0):
-            while ($row = $result->fetch_assoc()):
-                $bookingID     = $row['Booking_ID'];
-                $bookingStatus = $row['Booking_Status'];
-                $isPriority    = ($row['Booking_Priority'] === 'Y');
-
-                // Items
-                $itemStmt = $conn->prepare("SELECT Item_Name, Quantity FROM item WHERE Booking_ID = ?");
-                $itemStmt->bind_param("i", $bookingID);
-                $itemStmt->execute();
-                $itemResult = $itemStmt->get_result();
-
-                // Payment
-                $payStmt = $conn->prepare("SELECT Payment_Status, Amount FROM payment WHERE Booking_ID = ?");
-                $payStmt->bind_param("i", $bookingID);
-                $payStmt->execute();
-                $payResult    = $payStmt->get_result();
-                $paymentRow   = $payResult->fetch_assoc();
-                
-                $paymentStatus = isset($paymentRow['Payment_Status']) ? trim(strtoupper($paymentRow['Payment_Status'])) : '';
-                $totalAmount   = $paymentRow['Amount'] ?? $row['TotalFee'] ?? 0;
-                $payStmt->close();
-
-                // Y = paid, N = pay later (unpaid), '' = no payment record yet
-                $isPaid     = ($paymentStatus === 'Y');
-                $isPayLater = ($paymentStatus === 'N');
-                
-                // Helper variable to handle case-insensitive checks for button rendering
-                $currentStatusLower = strtolower($bookingStatus);
-
-                // Friendly label + badge class (handles the auto-cancelled state separately from staff rejection)
-                $displayStatus = $bookingStatus;
-                if ($currentStatusLower === 'cancelled_unpaid') {
-                    $displayStatus = 'Cancelled (Unpaid)';
-                    $statusBadgeClass = 'status-cancelled';
-                } elseif ($currentStatusLower === 'pending') {
-                    $statusBadgeClass = 'status-pending';
-                } elseif ($currentStatusLower === 'approved') {
-                    $statusBadgeClass = 'status-approved';
-                } elseif ($currentStatusLower === 'verification_sent') {
-                    $statusBadgeClass = 'status-verification_sent';
-                } elseif ($currentStatusLower === 'confirmed') {
-                    $statusBadgeClass = 'status-approved';
-                } else {
-                    $statusBadgeClass = 'status-rejected';
-                }
+            if ($bsl === 'pending')               $sc = 'status-pending';
+            elseif ($bsl === 'approved')          $sc = 'status-approved';
+            elseif ($bsl === 'rejected')          $sc = 'status-rejected';
+            elseif ($bsl === 'verification_sent') $sc = 'status-verification_sent';
+            elseif ($bsl === 'confirmed')         $sc = 'status-confirmed';
+            elseif ($bsl === 'collected')         $sc = 'status-collected';
+            else                                  $sc = 'status-other';
+            ?>
+            <div class="status-card <?php echo $extraClass; ?>">
+                <div class="card-header">
+                    <div class="header-main">
+                        <span class="order-id">ID: <?php echo $row['Booking_ID']; ?></span>
+                        <?php if ($isPrio): ?><span class="priority-badge">EMERGENCY</span><?php endif; ?>
+                        <span class="status-text <?php echo $sc; ?>"><?php echo htmlspecialchars($bstat); ?></span>
+                    </div>
+                </div>
+                <div class="summary-info">
+                    <p>Student   : <?php echo htmlspecialchars($row['Student_Name']); ?></p>
+                    <p>College   : <?php echo htmlspecialchars($row['Residential_Block'] ?? 'N/A'); ?></p>
+                    <p>Drop-off  : <?php echo date('d/m/Y', strtotime($row['DropOff_Date'])); ?></p>
+                    <p>Pick-up   : <?php echo date('d/m/Y', strtotime($row['Pickup_Date'])); ?></p>
+                    <p>Items     : <?php echo $row['TotalItem']; ?></p>
+                    <p>Total fee : RM <?php echo number_format((float)$feeToShow, 2); ?></p>
+                    <p>Payment   : <?php echo $isPaid ? '<strong style="color:#22c55e;">Paid</strong>' : '<span style="color:#856404;">Unpaid</span>'; ?></p>
+                </div>
+                <div class="button-container">
+                    <a href="staffBookingDetail.php?id=<?php echo $row['Booking_ID']; ?>" class="view-booking-btn">View Details</a>
+                </div>
+            </div>
+            <?php
+        }
         ?>
-        <div class="status-card">
-            <div class="card-header">
-                <div class="header-main">
-                    <span class="order-id">ID: <?php echo htmlspecialchars($bookingID); ?></span>
-                    <?php if ($isPriority): ?>
-                        <span class="priority-badge">EMERGENCY</span>
-                    <?php endif; ?>
-                    <div class="header-actions">
-                        <span class="status-text <?php echo $statusBadgeClass; ?>">
-                            <?php echo htmlspecialchars($displayStatus); ?>
-                        </span>
 
-                        <?php if ($isPaid): ?>
-                            <button class="pay-btn paid" disabled> Paid</button>
-                        <?php elseif ($currentStatusLower === 'approved'): ?>
-                            <button class="pay-btn"
-                                    onclick="redirectToPayment('<?php echo $bookingID; ?>', <?php echo (float)$totalAmount; ?>)">
-                                Pay Now
-                            </button>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            </div>
-
-            <div class="summary-info">
-                <p>Drop-off date : <?php echo htmlspecialchars($row['DropOff_Date']); ?></p>
-                <p>Pick-up date  : <?php echo htmlspecialchars($row['Pickup_Date']); ?></p>
-                <p>Item quantity : <?php echo htmlspecialchars($row['TotalItem'] ?? '0'); ?></p>
-                <p>College       : <?php echo htmlspecialchars($row['Residential_Block'] ?? 'N/A'); ?></p>
-                <p>Total fee     : RM <?php echo number_format((float)$totalAmount, 2); ?></p>
-                <?php if ($paymentRow): ?>
-                    <p>Payment status:
-                        <?php
-                            if ($isPaid)         echo '<strong style="color:#198754;"> Paid</strong>';
-                            elseif ($isPayLater)  echo '<span style="color:#856404;">Unpaid (Pay Later)</span>';
-                            else                  echo '<span style="color:#856404;">Unpaid</span>';
-                        ?>
-                    </p>
-                <?php else: ?>
-                    <p>Payment status: <span style="color:#856404;">Unpaid</span></p>
-                <?php endif; ?>
-
-                <?php if ($currentStatusLower === 'pending'): ?>
-                <?php elseif ($currentStatusLower === 'rejected'): ?>
-                    <div class="rejection-note">
-                        <strong>Rejected</strong>
-                        <?php if (!empty($row['Rejection_Reason'])): ?>
-                            : <?php echo htmlspecialchars($row['Rejection_Reason']); ?>
-                        <?php else: ?>
-                            . No reason was provided by staff.
-                        <?php endif; ?>
-                        <?php if (!empty($row['Rejection_Photo'])): ?>
-                            <br>
-                            <img src="<?php echo htmlspecialchars($row['Rejection_Photo']); ?>" alt="Rejection evidence"
-                                 style="max-width:220px; border-radius:10px; display:block; margin-top:8px; border:1px solid rgba(114,28,36,0.25);">
-                        <?php endif; ?>
-                    </div>
-                <?php elseif ($currentStatusLower === 'cancelled_unpaid'): ?>
-                    <div class="cancelled-note">
-                        <strong>Automatically Cancelled</strong> — payment wasn't completed before your chosen drop-off date, so this booking and its reserved slot were released.
-                    </div>
-                <?php elseif ($currentStatusLower === 'verification_sent'): ?>
-                    <div class="verif-action-note">
-                         Staff has sent a pickup verification request. Please check your Notification page to confirm.
-                    </div>
-                <?php endif; ?>
-
-                <!-- Drop-off photo verification / proof -->
-                <?php if (!empty($row['Dropoff_Photo']) && ($row['Dropoff_Status'] ?? '') === 'Pending'): ?>
-                <div class="dropoff-confirm-box">
-                    <p>Staff has uploaded a photo of your dropped-off items. Is this yours?</p>
-                    <img src="<?php echo htmlspecialchars($row['Dropoff_Photo']); ?>" alt="Drop-off photo">
-                    <form method="POST" style="display:inline;">
-                        <input type="hidden" name="dropoff_confirm_id" value="<?php echo $bookingID; ?>">
-                        <input type="hidden" name="dropoff_decision" value="yes">
-                        <button type="submit" class="confirm-yes-btn">Yes, this is mine</button>
-                    </form>
-                    <form method="POST" style="display:inline;">
-                        <input type="hidden" name="dropoff_confirm_id" value="<?php echo $bookingID; ?>">
-                        <input type="hidden" name="dropoff_decision" value="no">
-                        <button type="submit" class="confirm-no-btn">No, not mine</button>
-                    </form>
-                </div>
-                <?php elseif (!empty($row['Dropoff_Photo']) && ($row['Dropoff_Status'] ?? '') === 'Confirmed'): ?>
-                <div class="dropoff-confirm-box" style="background:#d4edda; border-color:rgba(21,87,36,0.25);">
-                    <p style="color:#155724;"> You confirmed this is your item. Kept here as proof until pickup.</p>
-                    <img src="<?php echo htmlspecialchars($row['Dropoff_Photo']); ?>" alt="Drop-off photo">
-                </div>
-                <?php elseif (($row['Dropoff_Status'] ?? '') === 'Rejected'): ?>
-                <div class="dropoff-confirm-box" style="background:#f8d7da; border-color:rgba(114,28,36,0.25);">
-                    <p style="color:#721c24;">You reported a mismatch on the drop-off photo. Staff has been notified and will re-upload.</p>
-                </div>
-                <?php endif; ?>
-
-                <p class="pickup-note">
-                    Note: Drop-off and Pick-up time is 8:00 AM - 11:00 AM only
-                </p>
-                <?php if ($currentStatusLower === 'pending' && !$isPaid): ?>
-                    <button class="small-cancel-btn" onclick="confirmCancellation(<?php echo $bookingID; ?>)">Cancel Booking</button>
-                <?php endif; ?>
-            </div>
-
-            <div class="button-container">
-                <button class="viewDetailsBtn">
-                    <span class="btn-text">View details</span>
-                    <span class="btn-arrow">&#9662;</span>
-                </button>
-            </div>
-
-            <div class="card-details">
-                <div class="details-content">
-                    <div class="detailsHeader">
-                        <span>Item details</span><span>Quantity</span>
-                    </div>
-                    <?php while ($item = $itemResult->fetch_assoc()): ?>
-                    <div class="itemRow">
-                        <span><?php echo htmlspecialchars($item['Item_Name']); ?></span>
-                        <span class="lineSpacer"></span>
-                        <span><?php echo htmlspecialchars($item['Quantity']); ?></span>
-                    </div>
-                    <?php endwhile; $itemStmt->close(); ?>
-                </div>
-            </div>
+        <!-- ── TAB: PENDING ── -->
+        <?php if ($activeTab === 'pending'): ?>
+        <div class="section-label">
+            Pending Approval
+            <?php if ($pending > 0): ?>
+            — <?php echo $pending; ?> booking<?php echo $pending !== 1 ? 's' : ''; ?> from <?php echo $pendingStudents; ?> student<?php echo $pendingStudents !== 1 ? 's' : ''; ?> waiting
+            <?php endif; ?>
         </div>
-        <?php endwhile;
+
+        <?php if ($pendingQ && $pendingQ->num_rows > 0): ?>
+        <div class="queue-wrap">
+            <table class="queue-table">
+                <thead>
+                    <tr>
+                        <th>Booking</th>
+                        <th>Student</th>
+                        <th>College</th>
+                        <th>Drop-off</th>
+                        <th>Pick-up</th>
+                        <th>Items</th>
+                        <th>Fee (RM)</th>
+                        <th>Submitted</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php while ($row = $pendingQ->fetch_assoc()):
+                    $isPrio    = $row['Booking_Priority'] === 'Y';
+                    $waitDays  = (int)floor((time() - strtotime($row['Booking_Date'])) / 86400);
+                    $feeToShow = $row['PaymentAmount'] ?? $row['TotalFee'];
+                ?>
+                <tr>
+                    <td>
+                        <strong style="color:#7c5cfc;">#<?php echo $row['Booking_ID']; ?></strong>
+                        <?php if ($isPrio): ?><br><span class="prio-badge">EMERGENCY</span><?php endif; ?>
+                    </td>
+                    <td>
+                        <?php echo htmlspecialchars($row['Student_Name']); ?>
+                        <span style="display:block;font-size:0.72rem;color:#888;"><?php echo htmlspecialchars($row['Student_ID']); ?></span>
+                    </td>
+                    <td><?php echo htmlspecialchars($row['Residential_Block'] ?? 'N/A'); ?></td>
+                    <td><?php echo date('d/m/Y', strtotime($row['DropOff_Date'])); ?></td>
+                    <td><?php echo date('d/m/Y', strtotime($row['Pickup_Date'])); ?></td>
+                    <td><?php echo $row['TotalItem']; ?></td>
+                    <td><?php echo number_format((float)$feeToShow, 2); ?></td>
+                    <td>
+                        <?php echo date('d/m/Y', strtotime($row['Booking_Date'])); ?>
+                        <span class="wait-days"><?php echo $waitDays === 0 ? 'Today' : $waitDays.'d ago'; ?></span>
+                    </td>
+                    <td>
+                        <form method="POST" style="display:inline;">
+                            <input type="hidden" name="approve_id" value="<?php echo $row['Booking_ID']; ?>">
+                            <button type="submit" class="btn-approve-sm"
+                                onclick="return confirm('Approve Booking #<?php echo $row['Booking_ID']; ?> for <?php echo htmlspecialchars(addslashes($row['Student_Name'])); ?>?')">
+                                Approve
+                            </button>
+                        </form>
+                        <button class="btn-reject-sm"
+                            onclick="openReject(<?php echo $row['Booking_ID']; ?>, '<?php echo htmlspecialchars(addslashes($row['Student_Name'])); ?>')">
+                            Reject
+                        </button>
+                        <a href="staffBookingDetail.php?id=<?php echo $row['Booking_ID']; ?>" class="view-link">View full details</a>
+                    </td>
+                </tr>
+                <?php endwhile; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php else: ?>
+            <div class="empty-state">No pending bookings. All caught up.</div>
+        <?php endif; ?>
+
+        <!-- ── TAB: APPROVED ── -->
+        <?php elseif ($activeTab === 'approved'): ?>
+        <div class="section-label">Approved Bookings</div>
+        <?php if ($approvedQ && $approvedQ->num_rows > 0):
+            while ($row = $approvedQ->fetch_assoc()):
+                renderCard($row);
+            endwhile;
         else: ?>
-            <p class="no-booking">
-                No bookings found. <a href="form.php" class="first-booking-link">Make your first booking!</a>
-            </p>
+            <div class="empty-state">No approved bookings.</div>
+        <?php endif; ?>
+
+        <!-- ── TAB: CANCELLED / REJECTED ── -->
+        <?php elseif ($activeTab === 'cancelled'): ?>
+        <div class="section-label">Cancelled / Rejected Bookings</div>
+        <?php if ($cancelledQ && $cancelledQ->num_rows > 0):
+            while ($row = $cancelledQ->fetch_assoc()):
+                renderCard($row, 'muted-card');
+            endwhile;
+        else: ?>
+            <div class="empty-state">No cancelled or rejected bookings.</div>
+        <?php endif; ?>
+
+        <!-- ── TAB: COLLECTED ── -->
+        <?php elseif ($activeTab === 'collected'): ?>
+        <div class="section-label">Collected Bookings</div>
+        <?php if ($collectedQ && $collectedQ->num_rows > 0):
+            while ($row = $collectedQ->fetch_assoc()):
+                renderCard($row, 'muted-card');
+            endwhile;
+        else: ?>
+            <div class="empty-state">No collected bookings yet.</div>
+        <?php endif; ?>
+
         <?php endif; ?>
 
     </div>
 </div>
 
-<form id="cancelForm" method="POST" action="">
-    <input type="hidden" id="cancel_booking_id" name="cancel_booking_id" value="">
-</form>
+<!-- Reject modal -->
+<div class="modal-overlay" id="rejectModal">
+    <div class="modal-box">
+        <h3 id="rejectTitle">Reject Booking</h3>
+        <p>Provide a clear reason. Upload a photo with a measuring tape beside the item as evidence if there is a mismatch. The reason and photo will be shown to the student.</p>
+        <form method="POST" enctype="multipart/form-data" id="rejectForm">
+            <input type="hidden" name="reject_id" id="rejectBid">
+            <textarea name="reject_reason" placeholder="e.g. Item declared as Small Bag but actual size is Large. See attached photo." required></textarea>
+            <label style="font-size:0.78rem;color:#888;display:block;margin-bottom:6px;">Proof photo (recommended)</label>
+            <input type="file" name="reject_photo" accept="image/*" style="font-size:0.82rem;margin-bottom:14px;">
+            <div class="modal-btns">
+                <button type="button" class="btn-cancel-modal" onclick="closeReject()">Cancel</button>
+                <button type="submit" class="btn-confirm-reject"
+                    onclick="return confirm('Confirm rejection? This cannot be undone.')">Confirm Reject</button>
+            </div>
+        </form>
+    </div>
+</div>
 
+<!-- Logout popup -->
 <div id="logoutPopup" class="hidden">
     <div id="logoutText">
         <p>Are you sure you want to logout?</p>
         <div id="logoutButton">
-            <button id="yesBTN" onclick="window.location.href='index.php'">Yes</button>
-            <button id="noBTN"  onclick="showLog()">No</button>
+            <button id="yesBTN" onclick="window.location.href='logout.php'">Yes</button>
+            <button id="noBTN" onclick="showLog()">No</button>
         </div>
     </div>
 </div>
 
+<!-- Profile popup -->
 <div id="profilePopup" class="hidden">
     <div id="profileShortDetails">
         <h3>Profile</h3>
-        <p>Name  : <span><?php echo isset($_SESSION['Student_Name']) ? htmlspecialchars($_SESSION['Student_Name']) : ''; ?></span></p>
-        <p>Email : <span><?php echo isset($_SESSION['Email']) ? htmlspecialchars($_SESSION['Email']) : ''; ?></span></p>
+        <p>Name  : <span><?php echo htmlspecialchars($staff_name); ?></span></p>
+        <p>Email : <span><?php echo htmlspecialchars($_SESSION['Email'] ?? ''); ?></span></p>
         <div id="profileBTN">
             <button id="close" onclick="showProfile()">Close</button>
         </div>
@@ -681,50 +691,32 @@ $result = $conn->query($sql);
 </div>
 
 <script>
-    function confirmCancellation(bookingId) {
-        if (confirm("Are you sure you want to permanently cancel and remove booking ID #" + bookingId + "? This cannot be undone.")) {
-            document.getElementById('cancel_booking_id').value = bookingId;
-            document.getElementById('cancelForm').submit();
-        }
-    }
+    function profileMenu() { document.getElementById('profileSelect').classList.toggle('show'); }
+    function showProfile() { document.getElementById('profilePopup').classList.toggle('hidden'); }
+    function showLog()     { document.getElementById('logoutPopup').classList.toggle('hidden'); }
 
-    function profileMenu() {
-        document.getElementById('profileSelect').classList.toggle('show');
-    }
-
-    function showProfile() { 
-        document.getElementById('profilePopup').classList.toggle('hidden'); 
-    }
-
-    function showLog() { 
-        document.getElementById('logoutPopup').classList.toggle('hidden'); 
-    }
-
-    function redirectToPayment(bookingId, amount) {
-        window.location.href = 'payment.php?booking_id=' + bookingId + '&amount=' + amount;
-    }
-
-    const filterBtn   = document.getElementById('filterBtn');
-    const filterLabel = document.getElementById('filterLabel');
-
-    filterBtn.addEventListener('click', function() {
-        let current = filterBtn.getAttribute('data-order');
-        window.location.href = 'mainStatus.php?sort=' + (current === 'recent' ? 'old' : 'recent');
+    // ── Intercept browser back button: show logout confirmation instead of leaving ──
+    history.pushState(null, '', location.href);
+    window.addEventListener('popstate', function () {
+        history.pushState(null, '', location.href);
+        document.getElementById('logoutPopup').classList.remove('hidden');
+    });
+    document.addEventListener('click', function(e) {
+        const c = document.getElementById('profileContainer');
+        if (!c.contains(e.target)) document.getElementById('profileSelect').classList.remove('show');
     });
 
-    document.querySelectorAll('.viewDetailsBtn').forEach(function(btn) {
-        btn.addEventListener('click', function() {
-            let card  = btn.closest('.status-card');
-            let panel = card.querySelector('.card-details');
-            let text  = btn.querySelector('.btn-text');
-            if (panel) {
-                panel.classList.toggle('open');
-                btn.classList.toggle('active');
-                text.textContent = panel.classList.contains('open') ? 'Hide details' : 'View details';
-            }
-        });
+    function openReject(bid, name) {
+        document.getElementById('rejectBid').value = bid;
+        document.getElementById('rejectTitle').textContent = 'Reject Booking #' + bid + ' — ' + name;
+        document.getElementById('rejectModal').classList.add('show');
+    }
+    function closeReject() {
+        document.getElementById('rejectModal').classList.remove('show');
+    }
+    document.getElementById('rejectModal').addEventListener('click', function(e) {
+        if (e.target === this) closeReject();
     });
 </script>
 </body>
 </html>
-<?php $conn->close(); ?>
