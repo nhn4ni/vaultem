@@ -34,25 +34,39 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $msg     = "Booking window added successfully.";
             $msgType = 'success';
         } else {
-            $msg     = "Failed to add booking window.";
+            $msg     = "Failed to add booking period.";
             $msgType = 'error';
         }
         $stmt->close();
     }
 }
 
-// Edit window
+// Edit window — extend-only (cannot shrink the range once created)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'edit') {
     $wid        = intval($_POST['window_id']);
     $label      = trim($_POST['label']      ?? '');
     $start_date = trim($_POST['start_date'] ?? '');
     $end_date   = trim($_POST['end_date']   ?? '');
 
+    // Fetch the existing window so we can enforce "extend only"
+    $origStmt = $conn->prepare("SELECT start_date, end_date FROM booking_window WHERE window_id = ?");
+    $origStmt->bind_param("i", $wid);
+    $origStmt->execute();
+    $origRow = $origStmt->get_result()->fetch_assoc();
+    $origStmt->close();
+
     if (!$label || !$start_date || !$end_date) {
         $msg     = "All fields are required.";
         $msgType = 'error';
     } elseif ($end_date < $start_date) {
         $msg     = "End date cannot be before start date.";
+        $msgType = 'error';
+    } elseif (!$origRow) {
+        $msg     = "Booking window not found.";
+        $msgType = 'error';
+    } elseif ($start_date > $origRow['start_date'] || $end_date < $origRow['end_date']) {
+        $msg     = "You can only extend a booking window, not shrink it. The new range must still cover "
+                 . date('d M Y', strtotime($origRow['start_date'])) . " – " . date('d M Y', strtotime($origRow['end_date'])) . ".";
         $msgType = 'error';
     } else {
         $stmt = $conn->prepare("UPDATE booking_window SET label=?, start_date=?, end_date=? WHERE window_id=?");
@@ -65,18 +79,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-// Delete window
+// Delete window — only allowed if no booking inside this window has been approved yet
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
     $wid = intval($_POST['window_id']);
-    $conn->query("DELETE FROM booking_window WHERE window_id = $wid");
-    $msg     = "Booking window deleted.";
-    $msgType = 'success';
+
+    $winStmt = $conn->prepare("SELECT start_date, end_date, label FROM booking_window WHERE window_id = ?");
+    $winStmt->bind_param("i", $wid);
+    $winStmt->execute();
+    $winRow = $winStmt->get_result()->fetch_assoc();
+    $winStmt->close();
+
+    if (!$winRow) {
+        $msg     = "Booking window not found.";
+        $msgType = 'error';
+    } else {
+        // Any booking whose drop-off date falls in this window AND has moved past pending/rejected
+        // (i.e. staff has already approved / acted on it) blocks the delete.
+        $checkStmt = $conn->prepare("
+            SELECT COUNT(*) AS c FROM booking
+            WHERE DropOff_Date BETWEEN ? AND ?
+              AND LOWER(Booking_Status) NOT IN ('pending', 'rejected')
+        ");
+        $checkStmt->bind_param("ss", $winRow['start_date'], $winRow['end_date']);
+        $checkStmt->execute();
+        $approvedCount = (int)$checkStmt->get_result()->fetch_assoc()['c'];
+        $checkStmt->close();
+
+        if ($approvedCount > 0) {
+            $msg     = "Cannot delete \"" . htmlspecialchars($winRow['label']) . "\" — " . $approvedCount
+                     . " booking(s) inside this window have already been approved by staff. "
+                     . "Deleting is only allowed before any booking in the window is approved.";
+            $msgType = 'error';
+        } else {
+            $delStmt = $conn->prepare("DELETE FROM booking_window WHERE window_id = ?");
+            $delStmt->bind_param("i", $wid);
+            $delStmt->execute();
+            $delStmt->close();
+            $msg     = "Booking window deleted.";
+            $msgType = 'success';
+        }
+    }
 }
 
 // ── Fetch all windows ─────────────────────────────────────────────────────────
 $windows = [];
 $res = $conn->query("SELECT * FROM booking_window ORDER BY start_date DESC");
 while ($row = $res->fetch_assoc()) $windows[] = $row;
+
+// For each window, precompute whether it's deletable (no approved bookings inside it)
+foreach ($windows as &$w) {
+    $chk = $conn->prepare("
+        SELECT COUNT(*) AS c FROM booking
+        WHERE DropOff_Date BETWEEN ? AND ?
+          AND LOWER(Booking_Status) NOT IN ('pending', 'rejected')
+    ");
+    $chk->bind_param("ss", $w['start_date'], $w['end_date']);
+    $chk->execute();
+    $w['approvedCount'] = (int)$chk->get_result()->fetch_assoc()['c'];
+    $chk->close();
+}
+unset($w);
 
 // Active window count
 $activeCount = $conn->query("SELECT COUNT(*) AS c FROM booking_window WHERE start_date <= CURDATE() AND end_date >= CURDATE()")->fetch_assoc()['c'];
@@ -155,6 +217,12 @@ $conn->close();
         }
         .btn-add:hover { background: #37216d; }
 
+        .form-note {
+            font-size: 0.76rem;
+            color: #8b82b5;
+            margin-top: 10px;
+        }
+
         /* Status banner */
         .status-banner {
             border-radius: 14px;
@@ -170,7 +238,7 @@ $conn->close();
         .banner-error    { background: rgba(239,68,68,0.08); color: #721c24; border-color: #ef4444; }
 
         /* Windows table */
-        .window-table-wrap { overflow-x: auto; margin-bottom: 30px; }
+        .window-table-wrap { overflow-x: auto; margin-bottom: 10px; }
         .window-table {
             width: 100%;
             border-collapse: collapse;
@@ -203,13 +271,17 @@ $conn->close();
 
         .btn-edit   { background: #cfe2ff; color: #084298; border: 1px solid #b6d4fe; padding: 5px 12px; border-radius: 10px; font-size: 0.75rem; font-weight: 700; cursor: pointer; font-family: inherit; margin-right: 4px; }
         .btn-delete { background: #f8d7da; color: #721c24; border: 1px solid #f5c2c7; padding: 5px 12px; border-radius: 10px; font-size: 0.75rem; font-weight: 700; cursor: pointer; font-family: inherit; }
-        .btn-edit:hover, .btn-delete:hover { opacity: 0.8; }
+        .btn-delete:disabled { background: #e8e7df; color: #aaa; border-color: #ddd; cursor: not-allowed; }
+        .btn-edit:hover, .btn-delete:not(:disabled):hover { opacity: 0.8; }
+
+        .locked-note { font-size: 0.68rem; color: #aaa; display: block; margin-top: 3px; }
 
         /* Edit modal */
         .modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:200; justify-content:center; align-items:center; }
         .modal-overlay.show { display:flex; }
         .modal-box { background:#f1f0ea; color:#1e1b4b; border-radius:20px; padding:28px; width:90%; max-width:480px; }
-        .modal-box h3 { margin:0 0 18px; font-size:1rem; color:#241253; }
+        .modal-box h3 { margin:0 0 8px; font-size:1rem; color:#241253; }
+        .modal-box .modal-subnote { font-size:0.78rem; color:#8b82b5; margin-bottom:16px; }
         .modal-form-group { display:flex; flex-direction:column; gap:5px; margin-bottom:14px; }
         .modal-form-group label { font-size:0.72rem; text-transform:uppercase; letter-spacing:0.4px; color:#888; font-weight:700; }
         .modal-form-group input { border:1px solid #ccc; border-radius:10px; padding:9px 12px; font-size:0.88rem; font-family:inherit; color:#1e1b4b; background:#fff; outline:none; }
@@ -276,10 +348,10 @@ $conn->close();
         <?php endif; ?>
 
         <!-- Add new window form -->
-        <div class="section-label">Add Booking Window</div>
+        <div class="section-label">Add Booking Period</div>
         <div class="add-form">
             <h3>Set a new date range when students can drop off and pick up items</h3>
-            <form method="POST">
+            <form method="POST" onsubmit="return confirm('You can delete this window anytime before any booking inside it is approved. Once a booking is approved, deletion locks automatically and the window can only be extended. Are you sure you want to add this window?');">
                 <input type="hidden" name="action" value="add">
                 <div class="form-row">
                     <div class="form-group" style="flex:2; min-width:200px;">
@@ -297,11 +369,12 @@ $conn->close();
                     <button type="submit" class="btn-add">Add Window</button>
                 </div>
             </form>
+            <p class="form-note">Note: a booking window can only be deleted while none of the bookings inside it have been approved yet. Once staff approves at least one booking in the window, it becomes permanent and can only be extended, never shrunk or removed — this protects students who already committed to those dates.</p>
         </div>
 
         <!-- Existing windows table -->
         <div class="section-label">
-            Existing Booking Windows (<?php echo count($windows); ?>)
+            Existing Booking Period (<?php echo count($windows); ?>)
         </div>
 
         <?php if (!empty($windows)): ?>
@@ -320,8 +393,9 @@ $conn->close();
                 <?php
                 $today = date('Y-m-d');
                 foreach ($windows as $w):
-                    $days     = (int)((strtotime($w['end_date']) - strtotime($w['start_date'])) / 86400) + 1;
+                    $days      = (int)((strtotime($w['end_date']) - strtotime($w['start_date'])) / 86400) + 1;
                     $isCurrent = ($today >= $w['start_date'] && $today <= $w['end_date']);
+                    $canDelete = ($w['approvedCount'] === 0);
                 ?>
                 <tr>
                     <td>
@@ -338,12 +412,20 @@ $conn->close();
                             onclick="openEdit(<?php echo $w['window_id']; ?>, '<?php echo addslashes($w['label']); ?>', '<?php echo $w['start_date']; ?>', '<?php echo $w['end_date']; ?>')">
                             Edit
                         </button>
+                        <?php if ($canDelete): ?>
                         <form method="POST" style="display:inline;"
                               onsubmit="return confirm('Delete this booking window? This cannot be undone.')">
                             <input type="hidden" name="action"    value="delete">
                             <input type="hidden" name="window_id" value="<?php echo $w['window_id']; ?>">
                             <button type="submit" class="btn-delete">Delete</button>
                         </form>
+                        <?php else: ?>
+                        <button type="button" class="btn-delete" disabled
+                            title="Cannot delete — <?php echo $w['approvedCount']; ?> booking(s) in this window have already been approved.">
+                            Delete
+                        </button>
+                        <span class="locked-note"><?php echo $w['approvedCount']; ?> booking(s) approved — locked</span>
+                        <?php endif; ?>
                     </td>
                 </tr>
                 <?php endforeach; ?>
@@ -363,6 +445,7 @@ $conn->close();
 <div class="modal-overlay" id="editModal">
     <div class="modal-box">
         <h3>Edit Booking Window</h3>
+        <p class="modal-subnote">You can only extend this window's range — the new dates must still fully cover the original range.</p>
         <form method="POST">
             <input type="hidden" name="action"    value="edit">
             <input type="hidden" name="window_id" id="editWindowId">
@@ -418,11 +501,23 @@ $conn->close();
         if (c && !c.contains(e.target)) document.getElementById('profileSelect').classList.remove('show');
     });
 
+    let editOriginalStart = '';
+    let editOriginalEnd   = '';
+
     function openEdit(id, label, start, end) {
         document.getElementById('editWindowId').value  = id;
         document.getElementById('editLabel').value     = label;
         document.getElementById('editStartDate').value = start;
         document.getElementById('editEndDate').value   = end;
+
+        editOriginalStart = start;
+        editOriginalEnd   = end;
+
+        // Extend-only: new start date can only move earlier (or stay the same),
+        // new end date can only move later (or stay the same).
+        document.getElementById('editStartDate').max = start;
+        document.getElementById('editEndDate').min    = end;
+
         document.getElementById('editModal').classList.add('show');
     }
     function closeEdit() {
@@ -431,9 +526,13 @@ $conn->close();
     document.getElementById('editModal').addEventListener('click', function(e) {
         if (e.target === this) closeEdit();
     });
+
+    // Keep end date's minimum respecting BOTH the original end date and the (possibly earlier) new start date
     document.getElementById('editStartDate').addEventListener('change', function() {
-        document.getElementById('editEndDate').min = this.value;
+        const minEnd = this.value > editOriginalEnd ? this.value : editOriginalEnd;
+        document.getElementById('editEndDate').min = minEnd;
     });
+
     document.querySelector('input[name="start_date"]').addEventListener('change', function() {
         document.querySelector('input[name="end_date"]').min = this.value;
     });

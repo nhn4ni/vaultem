@@ -132,6 +132,13 @@ $activeCheck = $conn->query("
 ");
 $hasActiveBooking = ($activeCheck && $activeCheck->fetch_assoc()['c'] > 0);
 
+// ── Check if a booking window is currently open ───────────────────────────────
+$windowCheck = $conn->query("
+    SELECT COUNT(*) AS c FROM booking_window
+    WHERE start_date <= CURDATE() AND end_date >= CURDATE()
+");
+$bookingOpen = ($windowCheck && $windowCheck->fetch_assoc()['c'] > 0);
+
 // ── Sort order ───────────────────────────────────────────────────────────────
 $order = (isset($_GET['sort']) && $_GET['sort'] === 'old') ? 'ASC' : 'DESC';
 
@@ -400,6 +407,10 @@ $result = $conn->query($sql);
                 disabled
                 title="You already have a booking in progress. You can book again once your items are collected."
                 style="opacity:0.45; cursor:not-allowed; transform:none;"
+            <?php elseif (!$bookingOpen): ?>
+                disabled
+                title="Booking is currently closed. Please check back during the next scheduled booking period."
+                style="opacity:0.45; cursor:not-allowed; transform:none;"
             <?php else: ?>
                 onclick="window.location.href='form.php'"
             <?php endif; ?>>
@@ -408,6 +419,10 @@ $result = $conn->query($sql);
         <?php if ($hasActiveBooking): ?>
             <p style="font-size:0.72rem; color:rgba(36,18,83,0.6); text-align:center; margin-top:6px; padding: 0 8px;">
                 Available after your items are collected
+            </p>
+        <?php elseif (!$bookingOpen): ?>
+            <p style="font-size:0.72rem; color:rgba(36,18,83,0.6); text-align:center; margin-top:6px; padding: 0 8px;">
+                Booking is currently closed
             </p>
         <?php endif; ?>
     </div>
