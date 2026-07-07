@@ -15,6 +15,7 @@
 <style>
     * {
         font-family: 'Inter', sans-serif;
+        
     }
 
     body {
@@ -85,14 +86,16 @@
         line-height: 1.2;
         color: #241253;
     }
+
+    
 </style>
 
 <body>
     <div id="wrapper">
 
         <header>
-            <h1>
-                <font face="Arial">VaulteM</font>
+            <h1 id="logo">
+                VaulteM
             </h1>
         </header>
 

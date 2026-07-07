@@ -8,7 +8,6 @@ if (!isset($_SESSION['role'])) {
 }
 
 $role     = $_SESSION['role'];
-// FIX: login.php sets User_Name for both students and staff
 $userName = $_SESSION['User_Name'] ?? 'User';
 ?>
 <!DOCTYPE html>
@@ -54,7 +53,6 @@ $userName = $_SESSION['User_Name'] ?? 'User';
 
 <?php endif; ?>
 
-<!-- FIX: logout form correctly POSTs to logout.php which destroys the session -->
 <div class="logout-form">
     <form method="POST" action="logout.php">
         <button type="submit" class="btn">Logout</button>

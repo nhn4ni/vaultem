@@ -101,7 +101,7 @@ mysqli_close($conn);
     <title>VaulteM - Sign up</title>
     <link rel="icon" type="image/x-icon" href="vaultemLogo.ico">
 
-    <!-- Font Awesome for eye icons -->
+    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
     <link rel="stylesheet" href="block.css" type="text/css">
@@ -110,6 +110,12 @@ mysqli_close($conn);
         /* Tighten right container padding */
         .rightcontainer {
             padding: 20px 70px;
+        }
+
+        .rightcontainer form {
+            width: 100%;
+            max-width: 900px;  
+            margin: 0 auto;     
         }
 
         /* Reduce heading margin */
@@ -123,6 +129,7 @@ mysqli_close($conn);
         .rightcontainer form select,
         .rightcontainer form button {
             margin-bottom: 8px;
+            margin-right:auto;
             padding: 10px 16px;
         }
 

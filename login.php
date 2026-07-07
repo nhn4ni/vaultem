@@ -85,10 +85,208 @@ $conn->close();
     <title>VaulteM – Login</title>
         <link rel="icon" type="image/x-icon" href="vaultemLogo.ico">
 
-    <link rel="stylesheet" href="login.css">
+    <!-- <link rel="stylesheet" href="login.css"> -->
     <link rel="stylesheet" href="mobile.css">
     <link rel="stylesheet"
     href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+*{
+    font-family: 'Inter', sans-serif;
+    box-sizing: border-box;
+}
+
+body {
+    background-color: #E8E9DE; 
+    margin:0px;
+}
+
+.back{
+    position: absolute; /* untuk kekalkan kat atas kiri */ 
+    border-style: none;
+    background-color: #E8E9DE;
+    font-size: 1.2rem;
+    font-weight:bold;
+    color: #241253;
+    margin: 15px;
+    
+}
+
+header h1{
+    color: #241253;
+    margin-bottom:0px;
+    padding: 0;
+    font-size: 3.5rem;
+    
+    text-shadow: 1px 1px 0px rgba(0, 0, 0, 0.395);
+}
+
+p{
+    font-weight: normal;
+}
+
+#wrapper{
+    display: flex;
+    height: 100vh;
+    width: 100vw; /*vw - viewport width  */
+    overflow: hidden;
+    
+}
+
+.leftcontainer{
+    flex: 1;
+    gap:0px;
+    background-color: #E8E9DE;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    
+}
+
+
+
+.rightcontainer {
+    flex: 1;
+    background-color: #241253;
+    color: #E8E9DE;
+    border-top-left-radius: 40px;
+    border-bottom-left-radius: 40px;
+    padding: 20px 70px; /* Updated from 20px 50px */
+    display: flex;
+    flex-direction: column;
+}
+
+.rightcontainer form {
+    width: 100%;
+    max-width: 900px; 
+    margin: 0 auto;
+}
+
+.rightcontainer input, .rightcontainer select {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    background-color: #e8e9deb9;
+    border: none; 
+    padding: 10px 16px; 
+    margin-bottom: 8px; 
+    outline: none;
+    font-size: 1rem;
+    border-radius: 20px;
+}
+
+.rightcontainer button {
+    width: 100%;
+    background-color: #E8E9DE;
+    border: none;
+    padding: 10px 16px; 
+    font-size: 1.1rem;
+    margin-top: 400px; 
+    border-radius: 25px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.rightcontainer input:hover,.rightcontainer select:hover{
+    background-color: #e8e9ded0;
+    color:rgba(0, 0, 0, 0.362);
+}
+
+.rightcontainer button:hover{
+    background-color: #e3e4d6;
+    color:rgba(0, 0, 0, 0.707);
+    cursor: pointer;
+    transform: translateY(-1px);
+}
+
+#popupError{
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+ #emptyField{
+    background-color: #f1f0ea;
+    padding: 15px;
+    border-radius: 20px;
+    width: 300px;
+    text-align: left;
+}
+
+
+#emptyText header{
+    background-color: #dc3545;
+    color: white;
+}
+#emptyText header h3{
+    margin: 0px;
+}
+
+
+#emptyBTN{
+    margin-top: 20px;
+    display: flex;
+    justify-content: right;
+}
+#emptyBTN button{
+    padding: 10px;
+    cursor: pointer;
+    border: none;
+    font-weight: bold;
+}
+
+.hidden{
+    display: none !important;
+}
+
+.password-box{
+    position: relative;
+    width: 100%;
+    max-width: 900px;
+    margin-bottom: 8px;
+}
+
+.password-box input{
+    width: 100%;
+    box-sizing: border-box;
+    display: block;
+    padding: 10px 42px 10px 16px;
+    margin-bottom: 0;
+    border-radius: 20px;
+}
+.password-box i {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: #555;
+    font-size: 1rem;
+    z-index: 2;
+}
+
+.password-box i:hover{
+    color: #000;
+}
+
+.rightcontainer a {
+    color: #ffffff; /* putih terang */
+    font-weight: bold;
+    text-decoration: underline;
+}
+
+.rightcontainer a:hover {
+    color: #ffd369; /* hover kuning supaya nampak */
+}
+    </style>
 </head>
 <body>
 <div id="wrapper">
