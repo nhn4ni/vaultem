@@ -17,6 +17,8 @@ $staff_name   = $_SESSION['Staff_Name'] ?? 'Staff';
 $PENALTY_RATE = 2.00;
 
 // ── Handle Actions ────────────────────────────────────────────────────────────
+// Staff can only waive a penalty now — students pay their own penalty online from mainStatus.php,
+// which automatically moves the booking to 'Settled' and removes it from this overdue list.
 $message = "";
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_type'])) {
     $bookingId = $conn->real_escape_string($_POST['booking_id']);
@@ -26,15 +28,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action_type'])) {
         $stmt->bind_param("s", $bookingId);
         if ($stmt->execute()) {
             $message = "Penalty for Booking #$bookingId has been successfully waived.";
-        }
-        $stmt->close();
-
-    } elseif ($_POST['action_type'] === 'collect') {
-        $amountPaid = floatval($_POST['penalty_amount']);
-        $stmt = $conn->prepare("UPDATE booking SET Booking_Status = 'Settled' WHERE Booking_ID = ?");
-        $stmt->bind_param("s", $bookingId);
-        if ($stmt->execute()) {
-            $message = "Successfully recorded penalty payment of RM " . number_format($amountPaid, 2) . " for Booking #$bookingId.";
         }
         $stmt->close();
     }
@@ -105,7 +98,6 @@ $conn->close();
             font-size: 0.75rem; font-weight: 700; cursor: pointer;
             font-family: inherit; margin-right: 4px;
         }
-        .btn-collect { background: #22c55e; color: #fff; }
         .btn-waive   { background: #e8e7df; color: #555; border: 1px solid #ccc; }
         .action-btn:hover { opacity: 0.85; }
 
@@ -152,6 +144,7 @@ $conn->close();
                 Accumulated across <strong><?php echo $totalOverdueRecords; ?></strong>
                 uncollected overdue booking<?php echo $totalOverdueRecords !== 1 ? 's' : ''; ?>
                 at a rate of <strong>RM <?php echo number_format($PENALTY_RATE, 2); ?> / day</strong>.
+                Students can pay their own penalty from their dashboard — settled bookings disappear from this list automatically.
             </div>
         </div>
 
@@ -185,10 +178,6 @@ $conn->close();
                             <form method="POST" style="display:inline-block; margin:0;">
                                 <input type="hidden" name="booking_id"     value="<?php echo $item['Booking_ID']; ?>">
                                 <input type="hidden" name="penalty_amount" value="<?php echo $item['Calculated_Fine']; ?>">
-                                <button type="submit" name="action_type" value="collect" class="action-btn btn-collect"
-                                    onclick="return confirm('Collect penalty of RM <?php echo $item['Calculated_Fine']; ?> for Booking #<?php echo $item['Booking_ID']; ?>?')">
-                                    Collect
-                                </button>
                                 <button type="submit" name="action_type" value="waive" class="action-btn btn-waive"
                                     onclick="return confirm('Waive penalty for Booking #<?php echo $item['Booking_ID']; ?>?')">
                                     Waive Fine
