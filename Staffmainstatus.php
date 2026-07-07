@@ -274,30 +274,10 @@ $activeTab = $_GET['tab'] ?? 'pending';
         /* Empty state */
         .empty-state { background:#f1f0ea; color:#8b82b5; border-radius:16px; padding:36px; text-align:center; font-size:0.9rem; }
 
-        /* Side nav (moved from quick-actions into leftcontainer) — plain list style, not buttons */
-        .side-nav {
-            display: flex;
-            flex-direction: column;
-            width: 80%;
-            max-width: 320px;
-            margin: 22px auto;
-            text-align: center;
-        }
-        .side-nav a {
-            display: block;
-            color: #241253;
-            text-decoration: none;
-            padding: 22px 4px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            border-bottom: 1px solid rgba(36,18,83,0.08);
-            transition: all 0.2s;
-        }
-        .side-nav a:last-child { border-bottom: none; }
-        .side-nav a:hover {
-            color: #7c5cfc;
-            background: rgba(124,92,252,0.06);
-        }
+        /* Quick actions */
+        .quick-actions { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:22px; }
+        .qa-btn { flex:1; min-width:90px; background:rgba(36,18,83,0.7); border:1px solid rgba(124,92,252,0.25); border-radius:12px; color:#E8E9DE; padding:12px 8px; font-size:0.78rem; font-weight:600; cursor:pointer; text-align:center; text-decoration:none; display:flex; flex-direction:column; align-items:center; gap:5px; transition:all 0.2s; }
+        .qa-btn:hover { background:rgba(124,92,252,0.22); border-color:#7c5cfc; transform:translateY(-2px); }
 
         .section-label { font-size:0.8rem; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:#8b82b5; margin-bottom:10px; }
 
@@ -366,10 +346,8 @@ $activeTab = $_GET['tab'] ?? 'pending';
 
         @media (max-width: 768px) {
             .stats-row { flex-direction:column; }
+            .quick-actions { flex-direction:column; }
             .header-main { flex-direction:column; align-items:flex-start; }
-            .side-nav {
-                max-width: 100%;
-            }
         }
     </style>
 </head>
@@ -380,16 +358,6 @@ $activeTab = $_GET['tab'] ?? 'pending';
         <header>
             <h1 onclick="window.location.href='staffMainStatus.php'" style="cursor:pointer;">VaulteM</h1>
         </header>
-
-        <!-- Navigation (moved here from the old horizontal quick-actions row) -->
-        <nav class="side-nav">
-            <a href="staffbookingrecords.php">Bookings</a>
-            <a href="Staffverifypanel.php">Verification</a>
-            <a href="staffStudentList.php">Students</a>
-            <a href="staffpenalty.php">Penalty</a>
-            <a href="staffreport.php">Reports</a>
-        </nav>
-
         <button type="button" id="booking" onclick="window.location.href='staffBookingWindow.php'">
             Manage Booking Form
         </button>
@@ -454,6 +422,15 @@ $activeTab = $_GET['tab'] ?? 'pending';
             <a href="staffMainStatus.php?tab=pending" class="review-btn">Review Now</a>
         </div>
         <?php endif; ?>
+
+        <!-- Quick actions -->
+        <div class="quick-actions">
+            <a class="qa-btn" href="staffbookingrecords.php">Bookings</a>
+            <a class="qa-btn" href="Staffverifypanel.php">Verification</a>
+            <a class="qa-btn" href="staffStudentList.php">Students</a>
+            <a class="qa-btn" href="staffpenalty.php">Penalty</a>
+            <a class="qa-btn" href="staffreport.php">Reports</a>
+        </div>
 
         <!-- ── 4 Tabs ── -->
         <div class="tab-bar">
@@ -694,13 +671,6 @@ $activeTab = $_GET['tab'] ?? 'pending';
     function profileMenu() { document.getElementById('profileSelect').classList.toggle('show'); }
     function showProfile() { document.getElementById('profilePopup').classList.toggle('hidden'); }
     function showLog()     { document.getElementById('logoutPopup').classList.toggle('hidden'); }
-
-    // ── Intercept browser back button: show logout confirmation instead of leaving ──
-    history.pushState(null, '', location.href);
-    window.addEventListener('popstate', function () {
-        history.pushState(null, '', location.href);
-        document.getElementById('logoutPopup').classList.remove('hidden');
-    });
     document.addEventListener('click', function(e) {
         const c = document.getElementById('profileContainer');
         if (!c.contains(e.target)) document.getElementById('profileSelect').classList.remove('show');
