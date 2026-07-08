@@ -1,5 +1,6 @@
 <?php
 session_start();
+date_default_timezone_set('Asia/Kuala_Lumpur');
 
 if (!isset($_SESSION['Staff_ID']) || $_SESSION['role'] !== 'staff') {
     header("Location: login.php");
@@ -15,6 +16,8 @@ $staff_name = $_SESSION['Staff_Name'] ?? 'Staff';
 // ── Handle inline approve / reject ───────────────────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
+    // Approve — space was already deducted in form.php at booking time,
+    // so approval must NOT touch storespace again (that caused double-deduction).
     if (isset($_POST['approve_id'])) {
         $bid = intval($_POST['approve_id']);
         $conn->query("UPDATE booking SET Booking_Status = 'Approved' WHERE Booking_ID = $bid AND LOWER(Booking_Status) = 'pending'");
@@ -23,10 +26,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $conn->query("INSERT INTO payment (Payment_Method, Payment_Status, Payment_Date, Amount, Booking_ID)
                       VALUES ('Online', 'N', CURDATE(), $totalFee, $bid)
                       ON DUPLICATE KEY UPDATE Payment_Status='N', Amount=$totalFee");
-        $spRes = $conn->query("SELECT SUM(Quantity) AS tot, Space_ID FROM item WHERE Booking_ID = $bid GROUP BY Space_ID");
-        while ($sr = $spRes->fetch_assoc()) {
-            $conn->query("UPDATE storespace SET Size = Size - {$sr['tot']} WHERE Space_ID = {$sr['Space_ID']}");
-        }
         header("Location: staffMainStatus.php?tab=pending&msg=approved&bid=$bid"); exit();
     }
 
@@ -59,6 +58,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($conn->affected_rows === 0) {
             die("Reject UPDATE ran but changed 0 rows. Booking_ID=$bid may not exist, or its Booking_Status is not 'pending'.");
         }
+
+        // ── Restore reserved space back to storespace since this booking is no longer active ──
+        $spRes = $conn->query("SELECT SUM(Quantity) AS tot, Space_ID FROM item WHERE Booking_ID = $bid GROUP BY Space_ID");
+        while ($sr = $spRes->fetch_assoc()) {
+            $conn->query("UPDATE storespace SET Size = Size + {$sr['tot']} WHERE Space_ID = {$sr['Space_ID']}");
+        }
+
         header("Location: staffMainStatus.php?tab=pending&msg=rejected&bid=$bid"); exit();
     }
 }
@@ -441,7 +447,7 @@ $activeTab = $_GET['tab'] ?? 'pending';
                 <strong><?php echo $pendingStudents; ?> student<?php echo $pendingStudents !== 1 ? 's' : ''; ?></strong>
                 <?php echo $pending !== 1 ? 'are' : 'is'; ?> waiting for your approval.
             </span>
-            <a href="staffMainStatus.php?tab=pending" class="review-btn">Review Now</a>
+            <a href="staffNotifications.php" class="review-btn">Review Now</a>
         </div>
         <?php endif; ?>
 
@@ -566,7 +572,7 @@ $activeTab = $_GET['tab'] ?? 'pending';
                 <tbody>
                 <?php while ($row = $pendingQ->fetch_assoc()):
                     $isPrio    = $row['Booking_Priority'] === 'Y';
-                    $waitDays  = (int)floor((time() - strtotime($row['Booking_Date'])) / 86400);
+                    $waitDays  = max(0, (int)floor((time() - strtotime($row['Booking_Date'])) / 86400));
                     $feeToShow = $row['PaymentAmount'] ?? $row['TotalFee'];
                 ?>
                 <tr>
@@ -745,10 +751,5 @@ $activeTab = $_GET['tab'] ?? 'pending';
         if (e.target === this) closeReject();
     });
 </script>
-
-
-
-
-
 </body>
 </html>
